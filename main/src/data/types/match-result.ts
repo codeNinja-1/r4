@@ -1,0 +1,1 @@
+export enum MatchResult { Pass, Fail, Uncertain };

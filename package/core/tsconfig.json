@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "target": "esnext",
+        "module": "esnext",
+        "esModuleInterop": true,
+        "isolatedModules": true,
+        "baseUrl": ".",
+        "moduleResolution": "node",
+        "paths": {
+            "@cubecraft/*": [ "../../main/src/*" ],
+        }
+    },
+    "include": [
+        "../../main/**/*",
+        "./src/**/*"
+    ]
+}

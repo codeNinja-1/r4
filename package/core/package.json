@@ -1,0 +1,19 @@
+{
+    "type": "module",
+    "source": "src/index.ts",
+    "main": "dist/main.js",
+    "scripts": {
+        "watch": "npx parcel watch",
+        "build": "npx parcel build"
+    },
+    "devDependencies": {
+        "parcel": "^2.9.3"
+    },
+    "dependencies": {
+        "@types/ws": "^8.5.6",
+        "ws": "^8.14.2"
+    },
+    "alias": {
+        "cubecraft": "../../main/src/"
+    }
+}

@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "target": "esnext",
+        "module": "esnext",
+        "esModuleInterop": true,
+        "isolatedModules": true,
+        "types": [ "@webgpu/types" ]
+    },
+    "include": [ "src/**/*.ts" ],
+    "exclude": [ "node_modules", "**/*.d.ts" ]
+}

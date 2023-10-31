@@ -1,0 +1,18 @@
+{
+    "type": "module",
+    "source": "src/index.ts",
+    "main": "dist/main.js",
+    "scripts": {
+        "watch": "npx parcel watch",
+        "build": "npx parcel build"
+    },
+    "devDependencies": {
+        "@types/node": "^20.8.9",
+        "parcel": "^2.9.3"
+    },
+    "targets": {
+        "main": {
+            "source": "src/main.ts"
+        }
+    }
+}
