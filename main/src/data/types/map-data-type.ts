@@ -1,6 +1,5 @@
 import { DecodedData } from "../decoded-data.js";
 import { DataType } from "./data-type.js";
-import { MatchResult } from "./match-result.js";
 import { NumberDataType } from "./number-data-type.js";
 
 export class MapDataType<K, V> implements DataType<Map<K, V>> {
@@ -42,30 +41,5 @@ export class MapDataType<K, V> implements DataType<Map<K, V>> {
         }
 
         return new DecodedData(data, itemIndex - index);
-    }
-
-    *matches(data: any) {
-        if (!(data instanceof Map)) yield MatchResult.Fail;
-        else yield MatchResult.Uncertain;
-
-        let keySuccess: boolean;
-
-        for (const [ key, value ] of data) {
-            if (keySuccess && MapDataType.singleKeyType) {
-                for (const result of this.keyType.matches(key)) {
-                    if (result == MatchResult.Fail) yield MatchResult.Fail;
-                    else yield MatchResult.Uncertain;
-                }
-            }
-
-            keySuccess = true;
-
-            for (const result of this.valueType.matches(value)) {
-                if (result == MatchResult.Fail) yield MatchResult.Fail;
-                else yield MatchResult.Uncertain;
-            }
-        }
-
-        yield MatchResult.Pass;
     }
 }

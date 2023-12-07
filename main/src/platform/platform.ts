@@ -1,4 +1,5 @@
 import { Container } from "./container.js";
+import { EnginePackage } from "./engine-package.js";
 import { VirtualPackageList } from "./virtual-package-list.js";
 
 export class Platform {
@@ -7,6 +8,7 @@ export class Platform {
 
     constructor() {
         this._containers = new Set();
+        this._containers.add(new Container(new EnginePackage()));
         this.packages = new VirtualPackageList(this);
     }
 

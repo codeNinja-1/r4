@@ -1,23 +1,29 @@
-export class Identifier {
-    namespace: string;
-    id: string;
+// export class Identifier {
+//     constructor(namespace: string, name: string) {
+//         return namespace + ':' + name;
+//     }
 
-    constructor(namespace: string, id: string) {
-        this.namespace = namespace;
-        this.id = id;
-    }
+//     static namespace(id: string): string {
+//         return id.slice(0, id.indexOf(':'));
+//     }
 
-    is(identifier) {
-        return this.namespace === identifier.namespace && this.id === identifier.id;
-    }
+//     static name(id: string): string {
+//         return id.slice(id.indexOf(':') + 1);
+//     }
 
-    toString() {
-        return `${this.namespace}:${this.id}`;
-    }
+//     static validate(id: string): boolean {
+//         let foundColon = false;
 
-    fromString(string) {
-        const [ namespace, id ] = string.split(':');
+//         for (let index = 0; index < id.length; index++) {
+//             if (id[index] == ':') {
+//                 if (foundColon) return false;
 
-        return new Identifier(namespace, id);
-    }
-}
+//                 foundColon = true;
+//             } else if (!'abcdefghijklmnopqrstuvwxyz0123456789_'.includes(id[index])) {
+//                 return false;
+//             }
+//         }
+
+//         return foundColon;
+//     }
+// };

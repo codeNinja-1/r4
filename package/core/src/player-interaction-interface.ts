@@ -2,11 +2,11 @@ import { ObjectDataType } from "@cubecraft/data/types/object-data-type.js";
 import { SocketInterface } from "@cubecraft/net/socket-interface.js";
 import { Identifier } from "@cubecraft/platform/identifier.js";
 import { SocketMessage } from "@cubecraft/net/socket-message.js";
-import { Rotation } from "@cubecraft/utils/rotation.js";
+import { Rotation } from "@cubecraft/utils/rotation/rotation.js";
 import { Vector3D } from "@cubecraft/utils/vector3d/vector3d.js";
 import { Vector3DDataType } from "@cubecraft/utils/vector3d/vector3d-data-type.js";
 import { ImmutableVector3D } from "@cubecraft/utils/vector3d/immutable-vector3d.js";
-import { RotationDataType } from "@cubecraft/utils/rotation-data-type.js";
+import { RotationDataType } from "@cubecraft/utils/rotation/rotation-data-type.js";
 
 export class PlayerInteractionInterface {
     static PlayerMoveEvent = new SocketMessage(

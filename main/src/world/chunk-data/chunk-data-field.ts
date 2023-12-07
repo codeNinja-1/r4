@@ -2,16 +2,7 @@ import { Vector3D } from "../../utils/vector3d/vector3d.js";
 import { Chunk } from "../chunk.js";
 
 export class ChunkDataField {
-    index: number;
-    chunk: Chunk;
-    type: string;
-    label: string;
-
-    constructor(index, label, type, chunk) {
-        this.index = index;
-        this.label = label;
-        this.type = type;
-        this.chunk = chunk;
+    constructor(public index: number, public label: string, public type: string, public chunk: Chunk) {
     }
 
     get(x: number | Vector3D, y?: number, z?: number) {

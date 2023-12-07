@@ -1,5 +1,3 @@
-import { Identifier } from "./identifier.js";
-
 export class Registry<T> {
     static Factory = Symbol("Factory");
 
@@ -13,11 +11,11 @@ export class Registry<T> {
         return this._data.entries();
     }
 
-    get(identifier: Identifier | string) {
-        return this._data.get(identifier.toString());
+    get(identifier: string) {
+        return this._data.get(identifier);
     }
 
-    register(identifier: Identifier | string, object: new () => T) {
-        this._data.set(identifier.toString(), object);
+    register(identifier: string, object: new () => T) {
+        this._data.set(identifier, object);
     }
 }

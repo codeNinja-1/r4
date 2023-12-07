@@ -1,5 +1,6 @@
 import { ImmutableVector2D } from "../utils/vector2d/immutable-vector2d.js";
 import { Vector2D } from "../utils/vector2d/vector2d.js";
+import { ChunkInstanceReferencer } from "./block-fields/chunk-instance-referencer.js";
 import { ChunkDataAllocator } from "./chunk-data/chunk-data-allocator.js";
 import { ChunkDataOptions } from "./chunk-data/chunk-data-options.js";
 import { ChunkDataReferencer } from "./chunk-data/chunk-data-referencer.js";
@@ -8,6 +9,7 @@ import { Entity } from "./entity.js";
 
 export class World {
     chunkSize = { chunkWidth: 16, chunkHeight: 64, chunkDepth: 16 };
+    referencer: ChunkDataReferencer;
     _entityIdMapping: Map<string, Entity>;
     _chunks: Map<string, Chunk>;
     _chunkDataOptions: ChunkDataOptions;
@@ -15,11 +17,13 @@ export class World {
     constructor() {
         this._entityIdMapping = new Map();
         this._chunks = new Map();
+        this.referencer = new ChunkDataReferencer(this.chunkSize);
     }
 
     createAllocator() {
-        const referencer = new ChunkDataReferencer(this.chunkSize);
-        const allocator = new ChunkDataAllocator({ referencer });
+        const allocator = new ChunkDataAllocator({ referencer: this.referencer });
+
+        ChunkInstanceReferencer.allocate(allocator);
 
         return allocator;
     }
@@ -77,5 +81,23 @@ export class World {
         entity._leaveWorld();
 
         this._entityIdMapping.delete(entity.id);
+    }
+
+    _validateDisconnectedEntities() {
+        for (const entity of this._entityIdMapping.values()) {
+            if (!entity.chunk) {
+                console.warn("Entity is not in a chunk\n", entity);
+            }
+        }
+    }
+
+    tick() {
+        for (const entity of this._entityIdMapping.values()) {
+            entity.tick();
+        }
+
+        for (const chunk of this.)
+
+        this._validateDisconnectedEntities();
     }
 }

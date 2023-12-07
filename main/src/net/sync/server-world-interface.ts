@@ -1,3 +1,4 @@
+import { OrDataType } from "../../data/types/nullable-data-type.js";
 import { WorldInterface } from "./world-interface.js";
 import { WorldOptionsDataType } from "./world-options-data-type.js";
 import { WorldOptionsData } from "./world-options-data.js";

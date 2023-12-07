@@ -1,19 +1,19 @@
 import { ChunkDataReferencer } from "./chunk-data-referencer.js"
 
 export interface ChunkDataOptions {
-    bits: {
+    bits: null | {
         count: number,
         referencer: ChunkDataReferencer
     },
-    map: {
+    map: null | {
         referencer: ChunkDataReferencer
     },
-    buffers: {
+    buffers: null | {
         type: string,
         label: string,
         referencer: ChunkDataReferencer
     }[],
-    fields: {
+    fields: null | {
         type: string,
         index: number | string,
         label: string

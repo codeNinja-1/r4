@@ -1,7 +1,6 @@
 import { DecodedData } from "../decoded-data.js";
 import { DataType } from "./data-type.js";
 import { ListType } from "./list-type.js";
-import { MatchResult } from "./match-result.js";
 import { NumberDataType } from "./number-data-type.js";
 
 export class ListDataType<D> implements DataType<D[] | Set<D>> {
@@ -45,20 +44,5 @@ export class ListDataType<D> implements DataType<D[] | Set<D>> {
         }
 
         return new DecodedData(data, itemIndex - index);
-    }
-
-    *matches(data: any) {
-        if (this.listType == ListType.Array && !Array.isArray(data)) yield MatchResult.Fail;
-        else if (this.listType == ListType.Set && !(data instanceof Set)) yield MatchResult.Fail;
-        else yield MatchResult.Uncertain;
-
-        for (const item of data) {
-            for (const result of this.itemType.matches(item)) {
-                if (result == MatchResult.Fail) yield MatchResult.Fail;
-                else yield MatchResult.Uncertain;
-            }
-        }
-
-        yield MatchResult.Pass;
     }
 }

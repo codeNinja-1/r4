@@ -1,6 +1,5 @@
 import { DecodedData } from "../decoded-data.js";
 import { DataType } from "./data-type.js";
-import { MatchResult } from "./match-result.js";
 
 // `{ ${keyName}: ${valueType}, ... }`
 export class ObjectDataType<T> implements DataType<T> {
@@ -9,7 +8,7 @@ export class ObjectDataType<T> implements DataType<T> {
 
     constructor(properties: { [key: string]: DataType<any> }) {
         this.properties = properties;
-        this.keys = null;
+        this.keys = [];
 
         this.sortProperties();
     }
@@ -41,22 +40,5 @@ export class ObjectDataType<T> implements DataType<T> {
         }
 
         return new DecodedData(data as T, length);
-    }
-
-    *matches(data: any) {
-        if (!(typeof data == 'object' && !Array.isArray(data) &&
-            !(data instanceof Set) && !(data instanceof WeakSet))) yield MatchResult.Fail;
-        else yield MatchResult.Uncertain;
-        
-        for (const key of this.keys) {
-            const type = this.properties[key];
-
-            for (const result of type.matches(data[key])) {
-                if (result == MatchResult.Fail) yield MatchResult.Fail;
-                else yield MatchResult.Uncertain;
-            }
-        }
-
-        yield MatchResult.Pass;
     }
 }

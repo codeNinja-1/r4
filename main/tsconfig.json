@@ -4,6 +4,7 @@
         "module": "esnext",
         "esModuleInterop": true,
         "isolatedModules": true,
+        "strictNullChecks": true,
         "types": [ "@webgpu/types" ]
     },
     "include": [ "src/**/*.ts" ],

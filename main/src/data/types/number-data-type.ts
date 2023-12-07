@@ -1,7 +1,6 @@
 import { DecodedData } from "../decoded-data.js";
 import { NumberTypeUtils } from "../number-type-utils.js";
 import { DataType } from "./data-type.js";
-import { MatchResult } from "./match-result.js";
 
 export class NumberDataType implements DataType<number> {
     constructor(public type: string) {
@@ -46,10 +45,5 @@ export class NumberDataType implements DataType<number> {
         else throw new Error(`Unknown number type: ${this.type}`);
 
         return new DecodedData(value, NumberTypeUtils.getSize(this.type));
-    }
-
-    *matches(value: any) {
-        if (typeof value != 'number') yield MatchResult.Fail;
-        else yield MatchResult.Pass;
     }
 }

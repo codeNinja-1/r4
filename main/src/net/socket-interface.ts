@@ -2,7 +2,6 @@ import ws from 'ws';
 import { Registry } from '../platform/registry.js';
 import { DataType } from '../data/types/data-type.js';
 import { SocketMessage } from './socket-message.js';
-import { Identifier } from '../platform/identifier.js';
 
 export class SocketInterface {
     socket: ws.WebSocket;
@@ -86,8 +85,8 @@ export class SocketInterface {
     }
 
     on(name: 'disconnect', callback: () => unknown): void;
-    on(name: string | Identifier, callback: (data: any) => unknown): void;
-    on(name: string | Identifier, callback: ((data: any) => unknown) | (() => unknown)): void {
+    on(name: string, callback: (data: any) => unknown): void;
+    on(name: string, callback: ((data: any) => unknown) | (() => unknown)): void {
         if (name == 'disconnect') {
             this._disconnectListeners.add(callback as () => unknown);
         } else {

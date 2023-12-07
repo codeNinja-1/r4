@@ -9,7 +9,7 @@ export class ChunkDataAllocator {
     _attributeCount: number;
     _buffers: { type: string, label: string }[];
     _fields: { type: string, index: number | string, label: string }[];
-    _generatedOptions: ChunkDataOptions;
+    _generatedOptions: ChunkDataOptions | null;
 
     constructor({ referencer }: { referencer: ChunkDataReferencer }) {
         this._referencer = referencer;

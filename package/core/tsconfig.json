@@ -6,6 +6,7 @@
         "isolatedModules": true,
         "baseUrl": ".",
         "moduleResolution": "node",
+        "strictNullChecks": true,
         "paths": {
             "@cubecraft/*": [ "../../main/src/*" ],
         }

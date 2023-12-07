@@ -162,8 +162,8 @@ export class Matrix4 {
     }
 
     static createRotationX(angle: number, target: Matrix4 = new Matrix4()) {
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
 
         target.data[0] = 1;
         target.data[1] = 0;
@@ -171,13 +171,13 @@ export class Matrix4 {
         target.data[3] = 0;
 
         target.data[4] = 0;
-        target.data[5] = c;
-        target.data[6] = s;
+        target.data[5] = cos;
+        target.data[6] = sin;
         target.data[7] = 0;
 
         target.data[8] = 0;
-        target.data[9] = -s;
-        target.data[10] = c;
+        target.data[9] = -sin;
+        target.data[10] = cos;
         target.data[11] = 0;
 
         target.data[12] = 0;
@@ -189,12 +189,12 @@ export class Matrix4 {
     }
 
     static createRotationY(angle: number, target: Matrix4 = new Matrix4()) {
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
 
-        target.data[0] = c;
+        target.data[0] = cos;
         target.data[1] = 0;
-        target.data[2] = -s;
+        target.data[2] = -sin;
         target.data[3] = 0;
 
         target.data[4] = 0;
@@ -202,9 +202,9 @@ export class Matrix4 {
         target.data[6] = 0;
         target.data[7] = 0;
 
-        target.data[8] = s;
+        target.data[8] = sin;
         target.data[9] = 0;
-        target.data[10] = c;
+        target.data[10] = cos;
         target.data[11] = 0;
 
         target.data[12] = 0;
@@ -216,16 +216,16 @@ export class Matrix4 {
     }
 
     static createRotationZ(angle: number, target: Matrix4 = new Matrix4()) {
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
 
-        target.data[0] = c;
-        target.data[1] = s;
+        target.data[0] = cos;
+        target.data[1] = sin;
         target.data[2] = 0;
         target.data[3] = 0;
 
-        target.data[4] = -s;
-        target.data[5] = c;
+        target.data[4] = -sin;
+        target.data[5] = cos;
         target.data[6] = 0;
         target.data[7] = 0;
 
