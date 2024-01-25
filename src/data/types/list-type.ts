@@ -1,0 +1,1 @@
+export enum ListType { Array, Set }

@@ -1,0 +1,1 @@
+{"version":3,"file":"test.js","sources":["../src/test/main.ts"],"sourcesContent":["import mocha from 'mocha';\n\nmocha.describe('test', () => {\n    mocha.it('should pass', () => {\n    });\n});"],"names":[],"mappings":";;AAEA,KAAK,CAAC,QAAQ,CAAC,MAAM,EAAE,MAAK;AACxB,IAAA,KAAK,CAAC,EAAE,CAAC,aAAa,EAAE,MAAK;AAC7B,KAAC,CAAC,CAAC;AACP,CAAC,CAAC"}

@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "target": "esnext",
+        "module": "nodenext",
+        "moduleResolution": "nodenext",
+        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true,
+        "isolatedModules": true,
+        "strictNullChecks": true,
+        "types": [ "@webgpu/types" ]
+    },
+    "include": [ "src/**/*.ts" ],
+    "exclude": [ "node_modules", "**/*.d.ts" ]
+}
