@@ -1,44 +1,52 @@
 import { Vector3D } from "../../utils/vector3d/vector3d.js";
-import { Chunk } from "../chunk.js";
+import { ChunkData } from "./chunk-data.js";
 
-export class ChunkDataField {
-    constructor(public index: number, public label: string, public type: string, public chunk: Chunk) {
-    }
+/**
+ * A ChunkDataField is an object where data for each
+ * block in a chunk can be contained.
+ */
+export abstract class ChunkDataField<RepresentedType> {
+    /**
+     * The `ChunkData` object that this field is contained in.
+     */
+    protected chunkData: ChunkData;
 
-    get(x: number | Vector3D, y?: number, z?: number) {
-        if (x instanceof Vector3D) {
-            let vector = x;
-
-            x = vector.x;
-            y = vector.y;
-            z = vector.z;
-        }
-
-        if (this.type == 'b') {
-            return this.chunk._bits.get(this.index, x, y, z);
-        } else if (this.type == 'a') {
-            return this.chunk._map.get(this.index, x, y, z);
+    /**
+     * Gets the value of the field at a given position.
+     */
+    get(position: Vector3D): RepresentedType;
+    get(index: number): RepresentedType;
+    get(x: number, y: number, z: number): RepresentedType;
+    get(x: number | Vector3D, y?: number, z?: number): RepresentedType {
+        if (typeof x == 'number' && typeof y == 'undefined') {
+            return this._get(x);
+        } else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
+            return this._get(this.chunkData.referencer.index(x, y, z));
+        } else if (x instanceof Vector3D) {
+            return this._get(this.chunkData.referencer.index(x));
         } else {
-            return this.chunk._buffers[this.index].get(x, y, z);
+            throw new Error("Invalid arguments");
         }
     }
 
-    set(x: number | Vector3D, y: number | any, z?: number, value?: any) {
-        if (x instanceof Vector3D) {
-            let vector = x;
-
-            x = vector.x;
-            y = vector.y;
-            z = vector.z;
-            value = y;
-        }
-
-        if (this.type == 'b') {
-            return this.chunk._bits.set(this.index, x, y, z, value);
-        } else if (this.type == 'a') {
-            return this.chunk._map.set(this.index, x, y, z, value);
+    /**
+     * Sets the value of the field at a given position.
+     */
+    set(position: Vector3D, value: RepresentedType): void;
+    set(index: number, value: RepresentedType): void;
+    set(x: number, y: number, z: number, value: RepresentedType): void;
+    set(x: Vector3D | number, y: RepresentedType | number, z?: number, value?: RepresentedType): void {
+        if (typeof x == 'number' && typeof y != 'number') {
+            return this._set(x, y);
+        } else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number' && typeof value != 'undefined') {
+            return this._set(this.chunkData.referencer.index(x, y, z), value);
+        } else if (x instanceof Vector3D && typeof y != 'number') {
+            return this._set(this.chunkData.referencer.index(x), y);
         } else {
-            return this.chunk._buffers[this.index].set(x, y, z, value);
+            throw new Error("Invalid arguments");
         }
     }
+
+    abstract _get(index: number): RepresentedType;
+    abstract _set(index: number, value: RepresentedType): void;
 }

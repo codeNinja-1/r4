@@ -2,11 +2,9 @@ import { InstanceReferencer } from "./instance-referencer.js";
 
 export class InstanceData<I> {
     referencer: InstanceReferencer<I>;
-    chunks: ArrayBuffer[];
     length: number;
 
     constructor() {
-        this.chunks = [];
         this.length = 0;
     }
 

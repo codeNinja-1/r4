@@ -1,7 +1,6 @@
 import { InstanceReferencer } from "../../render/model/instance-referencer.js";
 import { Chunk } from "../chunk.js";
 import { ChunkDataAllocator } from "../chunk-data/chunk-data-allocator.js";
-import { ChunkDataReferencer } from "../chunk-data/chunk-data-referencer.js";
 
 export class ChunkInstanceReferencer implements InstanceReferencer<number> {
     static instanceAddressField = 'instance_address';
@@ -10,18 +9,25 @@ export class ChunkInstanceReferencer implements InstanceReferencer<number> {
     constructor(public chunk: Chunk) {
     }
 
+    getChunkSize(): number {
+        return this.chunk.world.referencer.cells;
+    }
+
     getData(id: number): ArrayBuffer {
-        const buffer = new ArrayBuffer(3);
-        const array = new Uint8Array(buffer);
+        if (!this.chunk.world) throw new Error("Rendered chunks should be in a world");
 
-        array[0] = this.chunk.world.referencer.xOfIndex(id);
-        array[1] = this.chunk.world.referencer.yOfIndex(id);
-        array[2] = this.chunk.world.referencer.zOfIndex(id);
+        const array = new Uint8Array(3);
 
-        return buffer;
+        array[0] = this.chunk.world.referencer.x(id);
+        array[1] = this.chunk.world.referencer.y(id);
+        array[2] = this.chunk.world.referencer.z(id);
+
+        return array.buffer;
     }
 
     getAddress(id: number): number {
+        if (!this.chunk.world) throw new Error("Rendered chunks should be in a world");
+
         const field = this.chunk.field(ChunkInstanceReferencer.instanceAddressField);
 
         if (!field) {
@@ -29,9 +35,9 @@ export class ChunkInstanceReferencer implements InstanceReferencer<number> {
         }
 
         return field.get(
-                this.chunk.world.referencer.xOfIndex(id),
-                this.chunk.world.referencer.yOfIndex(id),
-                this.chunk.world.referencer.zOfIndex(id)
+                this.chunk.world.referencer.x(id),
+                this.chunk.world.referencer.y(id),
+                this.chunk.world.referencer.z(id)
             );
     }
 

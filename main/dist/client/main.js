@@ -142,7 +142,7 @@
       this[globalName] = mainExports;
     }
   }
-})({"2dF6g":[function(require,module,exports) {
+})({"3SUa7":[function(require,module,exports) {
 var global = arguments[3];
 var HMR_HOST = null;
 var HMR_PORT = 1234;
@@ -226,10 +226,20 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== "undefined") {
     var hostname = getHostname();
     var port = getPort();
-    var protocol = HMR_SECURE || location.protocol == "https:" && !/localhost|127.0.0.1|0.0.0.0/.test(hostname) ? "wss" : "ws";
-    var ws = new WebSocket(protocol + "://" + hostname + (port ? ":" + port : "") + "/");
+    var protocol = HMR_SECURE || location.protocol == "https:" && ![
+        "localhost",
+        "127.0.0.1",
+        "0.0.0.0"
+    ].includes(hostname) ? "wss" : "ws";
+    var ws;
+    try {
+        ws = new WebSocket(protocol + "://" + hostname + (port ? ":" + port : "") + "/");
+    } catch (err) {
+        if (err.message) console.error(err.message);
+        ws = {};
+    }
     // Web extension context
-    var extCtx = typeof chrome === "undefined" ? typeof browser === "undefined" ? null : browser : chrome;
+    var extCtx = typeof browser === "undefined" ? typeof chrome === "undefined" ? null : chrome : browser;
     // Safari doesn't support sourceURL in error stacks.
     // eval may also be disabled via CSP, so do a quick check.
     var supportsSourceURL = false;
@@ -293,7 +303,7 @@ if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== "undefined") {
         }
     };
     ws.onerror = function(e) {
-        console.error(e.message);
+        if (e.message) console.error(e.message);
     };
     ws.onclose = function() {
         console.warn("[parcel] \uD83D\uDEA8 Connection to the HMR server was lost");
@@ -303,7 +313,7 @@ function removeErrorOverlay() {
     var overlay = document.getElementById(OVERLAY_ID);
     if (overlay) {
         overlay.remove();
-        console.log("[parcel] ✨ Error resolved");
+        console.log("[parcel] \u2728 Error resolved");
     }
 }
 function createErrorOverlay(diagnostics) {
@@ -319,13 +329,13 @@ ${frame.code}`;
         errorHTML += `
       <div>
         <div style="font-size: 18px; font-weight: bold; margin-top: 20px;">
-          🚨 ${diagnostic.message}
+          \u{1F6A8} ${diagnostic.message}
         </div>
         <pre>${stack}</pre>
         <div>
           ${diagnostic.hints.map((hint)=>"<div>\uD83D\uDCA1 " + hint + "</div>").join("")}
         </div>
-        ${diagnostic.documentation ? `<div>📝 <a style="color: violet" href="${diagnostic.documentation}" target="_blank">Learn more</a></div>` : ""}
+        ${diagnostic.documentation ? `<div>\u{1F4DD} <a style="color: violet" href="${diagnostic.documentation}" target="_blank">Learn more</a></div>` : ""}
       </div>
     `;
     }
@@ -421,15 +431,10 @@ async function hmrApplyUpdates(assets) {
             let promises = assets.map((asset)=>{
                 var _hmrDownload;
                 return (_hmrDownload = hmrDownload(asset)) === null || _hmrDownload === void 0 ? void 0 : _hmrDownload.catch((err)=>{
-                    // Web extension bugfix for Chromium
-                    // https://bugs.chromium.org/p/chromium/issues/detail?id=1255412#c12
-                    if (extCtx && extCtx.runtime && extCtx.runtime.getManifest().manifest_version == 3) {
-                        if (typeof ServiceWorkerGlobalScope != "undefined" && global instanceof ServiceWorkerGlobalScope) {
-                            extCtx.runtime.reload();
-                            return;
-                        }
-                        asset.url = extCtx.runtime.getURL("/__parcel_hmr_proxy__?url=" + encodeURIComponent(asset.url + "?t=" + Date.now()));
-                        return hmrDownload(asset);
+                    // Web extension fix
+                    if (extCtx && extCtx.runtime && extCtx.runtime.getManifest().manifest_version == 3 && typeof ServiceWorkerGlobalScope != "undefined" && global instanceof ServiceWorkerGlobalScope) {
+                        extCtx.runtime.reload();
+                        return;
                     }
                     throw err;
                 });
@@ -667,7 +672,7 @@ exports.defineInteropFlag = function(a) {
 };
 exports.exportAll = function(source, dest) {
     Object.keys(source).forEach(function(key) {
-        if (key === "default" || key === "__esModule" || dest.hasOwnProperty(key)) return;
+        if (key === "default" || key === "__esModule" || Object.prototype.hasOwnProperty.call(dest, key)) return;
         Object.defineProperty(dest, key, {
             enumerable: true,
             get: function() {
@@ -729,37 +734,42 @@ class Client extends (0, _componentJs.Component) {
     }
 }
 
-},{"../view/dom.js":"hStJX","../world/world.js":"8482s","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","../render/renderer.js":"dWDik","../view/component.js":"90Lqu"}],"8482s":[function(require,module,exports) {
+},{"../render/renderer.js":"dWDik","../view/component.js":"90Lqu","../view/dom.js":"hStJX","../world/world.js":"8482s","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"dWDik":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+parcelHelpers.export(exports, "Renderer", ()=>Renderer);
+class Renderer {
+    world;
+    canvas;
+    perspective;
+    constructor(world, canvas){
+        this.world = world;
+        this.canvas = canvas;
+    }
+}
+
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"8482s":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
 parcelHelpers.export(exports, "World", ()=>World);
 var _immutableVector2DJs = require("../utils/vector2d/immutable-vector2d.js");
 var _vector2DJs = require("../utils/vector2d/vector2d.js");
+var _immutableVector3DJs = require("../utils/vector3d/immutable-vector3d.js");
 var _chunkDataAllocatorJs = require("./chunk-data/chunk-data-allocator.js");
 var _chunkDataReferencerJs = require("./chunk-data/chunk-data-referencer.js");
 var _chunkJs = require("./chunk.js");
 class World {
-    chunkSize = {
-        chunkWidth: 16,
-        chunkHeight: 64,
-        chunkDepth: 16
-    };
-    _entityIdMapping;
-    _chunks;
-    _chunkDataOptions;
-    constructor(){
-        this._entityIdMapping = new Map();
-        this._chunks = new Map();
-    }
-    createAllocator() {
-        const referencer = new (0, _chunkDataReferencerJs.ChunkDataReferencer)(this.chunkSize);
-        const allocator = new (0, _chunkDataAllocatorJs.ChunkDataAllocator)({
-            referencer
-        });
-        return allocator;
-    }
-    useAllocation(allocator) {
-        this._chunkDataOptions = allocator.generateOptions();
+    allocator;
+    chunkSize;
+    referencer;
+    entityIdMapping;
+    chunks;
+    constructor(allocator = new (0, _chunkDataAllocatorJs.ChunkDataAllocator)(), chunkSize = new (0, _immutableVector3DJs.ImmutableVector3D)(16, 64, 16)){
+        this.allocator = allocator;
+        this.chunkSize = chunkSize;
+        this.entityIdMapping = new Map();
+        this.chunks = new Map();
+        this.referencer = new (0, _chunkDataReferencerJs.ChunkDataReferencer)(chunkSize);
     }
     createChunk(x, z) {
         if (x instanceof (0, _vector2DJs.Vector2D)) {
@@ -777,11 +787,11 @@ class World {
             z = x.y;
             x = x.x;
         }
-        return this._chunks.get(x + "." + z) || null;
+        return this.chunks.get(x + "." + z) || null;
     }
     addEntity(entity) {
-        this._entityIdMapping.set(entity.id, entity);
-        const chunk = this.getChunk(Math.floor(entity.position.x / this.chunkSize.chunkWidth), Math.floor(entity.position.z / this.chunkSize.chunkDepth));
+        this.entityIdMapping.set(entity.id, entity);
+        const chunk = this.getChunk(Math.floor(entity.position.x / this.chunkSize.x), Math.floor(entity.position.z / this.chunkSize.z));
         if (!chunk) throw new Error("Cannot add entity to world: Chunk does not exist");
         chunk._entities.add(entity);
         entity._joinWorld(this);
@@ -790,11 +800,19 @@ class World {
     }
     removeEntity(entity) {
         entity._leaveWorld();
-        this._entityIdMapping.delete(entity.id);
+        this.entityIdMapping.delete(entity.id);
+    }
+    _validateDisconnectedEntities() {
+        for (const entity of this.entityIdMapping.values())if (!entity.chunk) console.warn("Entity is not in a chunk\n", entity);
+    }
+    tick() {
+        for (const entity of this.entityIdMapping.values())entity.tick();
+        for (const [_id, chunk] of this.chunks)chunk.tick();
+        this._validateDisconnectedEntities();
     }
 }
 
-},{"../utils/vector2d/immutable-vector2d.js":"amSYV","../utils/vector2d/vector2d.js":"jVV5b","./chunk-data/chunk-data-allocator.js":"5TrZk","./chunk-data/chunk-data-referencer.js":"33CVl","./chunk.js":"9FKMj","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"amSYV":[function(require,module,exports) {
+},{"../utils/vector2d/immutable-vector2d.js":"amSYV","../utils/vector2d/vector2d.js":"jVV5b","../utils/vector3d/immutable-vector3d.js":"bFhiH","./chunk-data/chunk-data-allocator.js":"5TrZk","./chunk-data/chunk-data-referencer.js":"33CVl","./chunk.js":"9FKMj","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"amSYV":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
 parcelHelpers.export(exports, "ImmutableVector2D", ()=>ImmutableVector2D);
@@ -914,282 +932,27 @@ class Vector2D {
     }
 }
 
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"5TrZk":[function(require,module,exports) {
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"bFhiH":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "ChunkDataAllocator", ()=>ChunkDataAllocator);
-class ChunkDataAllocator {
-    _referencer;
-    _bitCount;
-    _attributeCount;
-    _buffers;
-    _fields;
-    _generatedOptions;
-    constructor({ referencer }){
-        this._referencer = referencer;
-        this._bitCount = 0;
-        this._attributeCount = 0;
-        this._buffers = [];
-        this._fields = [];
-        this._generatedOptions = null;
+parcelHelpers.export(exports, "ImmutableVector3D", ()=>ImmutableVector3D);
+var _vector3DJs = require("./vector3d.js");
+class ImmutableVector3D extends (0, _vector3DJs.Vector3D) {
+    constructor(x = 0, y = 0, z = 0){
+        super(x, y, z);
     }
-    allocate(type, label = "") {
-        if (type == "b") {
-            let index = this._bitCount++;
-            this._fields.push({
-                type: "b",
-                index,
-                label
-            });
-            return index;
-        } else if (type == "a") {
-            let index = this._attributeCount++;
-            this._fields.push({
-                type: "a",
-                index: label || index,
-                label: label || index.toString()
-            });
-            return label || index;
-        } else {
-            const index = this._buffers.length;
-            this._buffers.push({
-                type,
-                label
-            });
-            this._fields.push({
-                type,
-                index,
-                label
-            });
-            return index;
-        }
+    _set(x, y, z) {
+        return new ImmutableVector3D(x, y, z);
     }
-    generateOptions() {
-        if (this._generatedOptions) return this._generatedOptions;
-        this._generatedOptions = {
-            bits: null,
-            map: null,
-            buffers: [],
-            fields: this._fields
-        };
-        if (this._bitCount > 0) this._generatedOptions.bits = {
-            count: this._bitCount,
-            referencer: this._referencer
-        };
-        if (this._attributeCount > 0) this._generatedOptions.map = {
-            referencer: this._referencer
-        };
-        for (const buffer of this._buffers)this._generatedOptions.buffers.push({
-            type: buffer.type,
-            label: buffer.label,
-            referencer: this._referencer
-        });
-        return this._generatedOptions;
+    set(x, y, z) {
+        throw new Error("Cannot set immutable vector");
+    }
+    static from(vector, format) {
+        return new ImmutableVector3D(...(0, _vector3DJs.Vector3D)._from(vector, format));
     }
 }
 
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"33CVl":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "ChunkDataReferencer", ()=>ChunkDataReferencer);
-class ChunkDataReferencer {
-    _chunkWidth;
-    _chunkHeight;
-    _chunkDepth;
-    constructor({ chunkWidth = 16, chunkHeight = 16, chunkDepth = 32 } = {}){
-        this._chunkWidth = chunkWidth;
-        this._chunkHeight = chunkHeight;
-        this._chunkDepth = chunkDepth;
-    }
-    get cellsInChunk() {
-        return this._chunkWidth * this._chunkHeight * this._chunkDepth;
-    }
-    indexOfPosition(x, y, z) {
-        if (x < 0 || x >= this._chunkWidth) throw new Error(`Coordinate X in chunk is out of bounds: 0 ≤ ${x} < ${this._chunkWidth}`);
-        if (y < 0 || y >= this._chunkHeight) throw new Error(`Coordinate Y in chunk is out of bounds: 0 ≤ ${y} < ${this._chunkHeight}`);
-        if (z < 0 || z >= this._chunkDepth) throw new Error(`Coordinate Z in chunk is out of bounds: 0 ≤ ${z} < ${this._chunkDepth}`);
-        return x + y * this._chunkWidth + z * this._chunkWidth * this._chunkHeight;
-    }
-    xOfIndex(index) {
-        return index % this._chunkWidth;
-    }
-    yOfIndex(index) {
-        return Math.floor(index / this._chunkWidth) % this._chunkHeight;
-    }
-    zOfIndex(index) {
-        return Math.floor(index / (this._chunkWidth * this._chunkHeight));
-    }
-}
-
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"9FKMj":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "Chunk", ()=>Chunk);
-var _chunkDataBitsJs = require("./chunk-data/chunk-data-bits.js");
-var _chunkDataBufferJs = require("./chunk-data/chunk-data-buffer.js");
-var _chunkDataFieldJs = require("./chunk-data/chunk-data-field.js");
-var _chunkDataMapJs = require("./chunk-data/chunk-data-map.js");
-class Chunk {
-    world;
-    position;
-    _entities;
-    _bits;
-    _buffers;
-    _map;
-    _fields;
-    constructor(){
-        this.world = null;
-        this.position = null;
-        this._entities = new Set();
-        this._bits = null;
-        this._buffers = [];
-        this._map = null;
-        this._fields = new Map();
-    }
-    _unload() {
-        for (const entity of this._entities)this.world._entityIdMapping.delete(entity.id);
-    }
-    _setup() {
-        const { bits, buffers, map, fields } = this.world._chunkDataOptions;
-        if (bits) this._bits = new (0, _chunkDataBitsJs.ChunkDataBits)(bits);
-        if (map) this._map = new (0, _chunkDataMapJs.ChunkDataMap)(map);
-        for (const buffer of buffers)this._buffers.push(new (0, _chunkDataBufferJs.ChunkDataBuffer)(buffer));
-        for (const field of fields)this._fields.set(field.label, new (0, _chunkDataFieldJs.ChunkDataField)(field.index, field.label, field.type, this));
-    }
-    field(name) {
-        return this._fields.get(name);
-    }
-}
-
-},{"./chunk-data/chunk-data-bits.js":"5Gx9R","./chunk-data/chunk-data-buffer.js":"5urRi","./chunk-data/chunk-data-field.js":"1Riqp","./chunk-data/chunk-data-map.js":"dOIN3","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"5Gx9R":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "ChunkDataBits", ()=>ChunkDataBits);
-class ChunkDataBits {
-    _count;
-    _referencer;
-    _label;
-    _arrays;
-    constructor({ label = "", count, referencer, _arrays = null }){
-        this._count = count;
-        this._referencer = referencer;
-        this._label = label;
-        this._arrays = _arrays;
-        if (!this._arrays) this._makeArrays();
-    }
-    _makeArrays() {
-        this._arrays = [];
-        for(let i = 0; i < this._count / 8; i++)this._arrays.push(new Uint8Array(this._referencer.cellsInChunk));
-    }
-    _labelString() {
-        if (this._label) return `'${this._label}'`;
-        else return "[ChunkDataBits]";
-    }
-    _array(index) {
-        return this._arrays[Math.floor(index / 8)];
-    }
-    get(bitIndex, x, y, z) {
-        if (typeof y == "undefined") {
-            if (x < 0 || x >= this._referencer._chunkWidth) throw new Error(`Index in ${this._labelString()} is out of bounds: ${x}`);
-            return this._array(bitIndex)[x] & 1 << bitIndex % 8;
-        } else return this._array(bitIndex)[this._referencer.indexOfPosition(x, y, z)] & 1 << bitIndex % 8;
-    }
-    set(bitIndex, x, y, z, value) {
-        if (typeof y == "undefined") {
-            if (x < 0 || x >= this._referencer._chunkWidth) throw new Error(`Index in ${this._labelString()} is out of bounds: ${x}`);
-            if (value) this._array(bitIndex)[x] |= 1 << bitIndex;
-            else this._array(bitIndex)[x] &= ~(1 << bitIndex);
-        } else if (value) this._array(bitIndex)[this._referencer.indexOfPosition(x, y, z)] |= 1 << bitIndex % 8;
-        else this._array(bitIndex)[this._referencer.indexOfPosition(x, y, z)] &= ~(1 << bitIndex % 8);
-    }
-}
-
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"5urRi":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "ChunkDataBuffer", ()=>ChunkDataBuffer);
-class ChunkDataBuffer {
-    _arrayType;
-    _referencer;
-    _label;
-    _data;
-    constructor({ label = "", type, referencer }){
-        this._arrayType = ChunkDataBuffer._typeToTypedArrayConstructor(type);
-        this._referencer = referencer;
-        this._label = label;
-        this._data = new this._arrayType(referencer.cellsInChunk);
-    }
-    _labelString() {
-        if (this._label) return `'${this._label}'`;
-        else return `ChunkDataBuffer<${this._data.constructor.name}>`;
-    }
-    get(x, y, z) {
-        if (typeof y == "undefined") {
-            if (x < 0 || x >= this._referencer._chunkWidth) throw new Error(`Index in ${this._labelString()} is out of bounds: ${x}`);
-            return this._data[x];
-        } else return this._data[this._referencer.indexOfPosition(x, y, z)];
-    }
-    set(x, y, z, value) {
-        if (typeof z === "undefined") {
-            if (x < 0 || x >= this._referencer._chunkWidth) throw new Error(`Index in ${this._labelString()} is out of bounds: ${x}`);
-            this._data[x] = z;
-        } else this._data[this._referencer.indexOfPosition(x, y, z)] = value;
-    }
-    static _typeToTypedArrayConstructor(type) {
-        if (type == "i8") return Int8Array;
-        if (type == "i16") return Int16Array;
-        if (type == "i32") return Int32Array;
-        if (type == "u8") return Uint8Array;
-        if (type == "u16") return Uint16Array;
-        if (type == "u32") return Uint32Array;
-        if (type == "f32") return Float32Array;
-        if (type == "f64") return Float64Array;
-        throw new Error(`Unknown array type: ${type}`);
-    }
-}
-
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"1Riqp":[function(require,module,exports) {
-var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "ChunkDataField", ()=>ChunkDataField);
-var _vector3DJs = require("../../utils/vector3d/vector3d.js");
-class ChunkDataField {
-    index;
-    chunk;
-    type;
-    label;
-    constructor(index, label, type, chunk){
-        this.index = index;
-        this.label = label;
-        this.type = type;
-        this.chunk = chunk;
-    }
-    get(x, y, z) {
-        if (x instanceof (0, _vector3DJs.Vector3D)) {
-            let vector = x;
-            x = vector.x;
-            y = vector.y;
-            z = vector.z;
-        }
-        if (this.type == "b") return this.chunk._bits.get(this.index, x, y, z);
-        else if (this.type == "a") return this.chunk._map.get(this.index, x, y, z);
-        else return this.chunk._buffers[this.index].get(x, y, z);
-    }
-    set(x, y, z, value) {
-        if (x instanceof (0, _vector3DJs.Vector3D)) {
-            let vector = x;
-            x = vector.x;
-            y = vector.y;
-            z = vector.z;
-            value = y;
-        }
-        if (this.type == "b") return this.chunk._bits.set(this.index, x, y, z, value);
-        else if (this.type == "a") return this.chunk._map.set(this.index, x, y, z, value);
-        else return this.chunk._buffers[this.index].set(x, y, z, value);
-    }
-}
-
-},{"../../utils/vector3d/vector3d.js":"32Wc4","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"32Wc4":[function(require,module,exports) {
+},{"./vector3d.js":"32Wc4","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"32Wc4":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
 parcelHelpers.export(exports, "Vector3D", ()=>Vector3D);
@@ -1361,61 +1124,150 @@ class MutableVector3D extends (0, _vector3DJs.Vector3D) {
     }
 }
 
-},{"./vector3d.js":"32Wc4","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"bFhiH":[function(require,module,exports) {
+},{"./vector3d.js":"32Wc4","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"5TrZk":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "ImmutableVector3D", ()=>ImmutableVector3D);
-var _vector3DJs = require("./vector3d.js");
-class ImmutableVector3D extends (0, _vector3DJs.Vector3D) {
-    constructor(x = 0, y = 0, z = 0){
-        super(x, y, z);
+/**
+ * The ChunkDataAllocator allows multiple fields to be
+ * allocated before creating chunks.
+ * 
+ * * Fields may be allocated using the `allocate()`
+ * method, passing in `ChunkDataFieldAllocation`
+ * objects.
+ * * A map of `ChunkDataField` objects can be instantiated
+ * using the `initialize()` method.
+ */ parcelHelpers.export(exports, "ChunkDataAllocator", ()=>ChunkDataAllocator);
+class ChunkDataAllocator {
+    fields = new Map();
+    constructor(){}
+    allocate(id, field) {
+        if (this.fields.has(id)) throw new Error(`Field id '${id}' is already used`);
+        this.fields.set(id, field);
     }
-    _set(x, y, z) {
-        return new ImmutableVector3D(x, y, z);
-    }
-    set(x, y, z) {
-        throw new Error("Cannot set immutable vector");
-    }
-    static from(vector, format) {
-        return new ImmutableVector3D(...(0, _vector3DJs.Vector3D)._from(vector, format));
+    initialize() {
+        const fields = new Map();
+        for (const [id, field] of this.fields)fields.set(id, field.instantiate());
+        return fields;
     }
 }
 
-},{"./vector3d.js":"32Wc4","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"dOIN3":[function(require,module,exports) {
+},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"33CVl":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "ChunkDataMap", ()=>ChunkDataMap);
-class ChunkDataMap {
-    _referencer;
-    _map;
-    constructor({ referencer }){
-        this._referencer = referencer;
-        this._map = new Map();
+/**
+ * A `ChunkDataReferencer` converts between indexes and
+ * positions in chunk data for given chunk dimensions.
+ * 
+ * * The `index()` method converts a position to an
+ * index in chunk data.
+ * * The `position()` method converts an index in chunk
+ * data to a position, based on the underlying `x()`,
+ * `y()`, and `z()` methods.
+ * * The `dimensions` property is a 3D vector containing
+ * the dimensions of the chunk.
+ * * The `cells` property is the total number of cells
+ * in a chunk, equal to `dimensions.x * dimensions.y *
+ * dimensions.z`.
+ */ parcelHelpers.export(exports, "ChunkDataReferencer", ()=>ChunkDataReferencer);
+var _mutableVector3DJs = require("../../utils/vector3d/mutable-vector3d.js");
+var _vector3DJs = require("../../utils/vector3d/vector3d.js");
+class ChunkDataReferencer {
+    /**
+     * The dimensions of the chunk as a 3D vector.
+     */ dimensions;
+    /**
+     * Creates a new `ChunkDataReferencer` using the
+     * chunk dimensions passed in through the first
+     * argument.
+     */ constructor(dimensions){
+        this.dimensions = dimensions;
     }
-    get(attribute, x, y, z) {
-        let index = typeof y == "undefined" ? x : this._referencer.indexOfPosition(x, y, z);
-        return this._map.get(attribute + "." + index);
+    /**
+     * Returns the total number of cells in a chunk.
+     */ get cells() {
+        return this.dimensions.x * this.dimensions.y * this.dimensions.z;
     }
-    set(attribute, x, y, z, value) {
-        let index = typeof y == "undefined" ? x : this._referencer.indexOfPosition(x, y, z);
-        this._map.set(attribute + "." + index, value);
+    index(x, y, z) {
+        if (x instanceof (0, _vector3DJs.Vector3D)) {
+            y = x.y;
+            z = x.z;
+            x = x.x;
+        } else {
+            if (y === undefined || z === undefined) throw new Error(`Invalid arguments`);
+        }
+        if (x < 0 || x >= this.dimensions.x || y < 0 || y >= this.dimensions.y || z < 0 || z >= this.dimensions.z) throw new Error(`Coordinates are out of bounds`);
+        return x + y * this.dimensions.x + z * this.dimensions.x * this.dimensions.y;
+    }
+    /**
+     * Computes the x position of a specified chunk
+     * data index. This can be used with the `y()` and
+     * `z()` methods to get the complete position
+     * without creating a vector.
+     */ x(index) {
+        return index % this.dimensions.x;
+    }
+    /**
+     * Computes the y position of a specified chunk
+     * data index. This can be used with the `x()`
+     * and `z()` methods to get the complete position
+     * without creating a vector.
+     */ y(index) {
+        return Math.floor(index / this.dimensions.x) % this.dimensions.y;
+    }
+    /**
+     * Computes the z position of a specified chunk
+     * data index. This can be used with the `x()` and
+     * `y()` methods to get the complete position
+     * without creating a vector.
+     */ z(index) {
+        return Math.floor(index / (this.dimensions.x * this.dimensions.y));
+    }
+    /**
+     * Computes the position of a specified chunk data
+     * index. Equivalent to calling `x()`, `y()`, and
+     * `z()`, then assembling a `Vector3D` from the
+     * components.
+     * 
+     * The method is the opposite of `index()`.
+     */ position(index) {
+        return new (0, _mutableVector3DJs.MutableVector3D)(this.x(index), this.y(index), this.z(index));
     }
 }
 
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"dWDik":[function(require,module,exports) {
+},{"../../utils/vector3d/mutable-vector3d.js":"alfDC","../../utils/vector3d/vector3d.js":"32Wc4","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"9FKMj":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "Renderer", ()=>Renderer);
-class Renderer {
-    world;
-    canvas;
-    perspective;
-    constructor(world, canvas){
-        this.world = world;
-        this.canvas = canvas;
+parcelHelpers.export(exports, "Chunk", ()=>Chunk);
+var _immutableVector2DJs = require("../utils/vector2d/immutable-vector2d.js");
+class Chunk {
+    _world;
+    position;
+    _entities;
+    chunkData;
+    constructor(){
+        this._world = null;
+        this.position = new (0, _immutableVector2DJs.ImmutableVector2D)();
+        this._entities = new Set();
+    }
+    get world() {
+        if (!this._world) throw new Error(`Chunk is not in a world`);
+        return this._world;
+    }
+    set world(world) {
+        this._world = world;
+    }
+    _unload() {
+        for (const entity of this._entities)this.world.entityIdMapping.delete(entity.id);
+    }
+    _setup() {
+        this.chunkData.fields ||= this.world.allocator.initialize();
+    }
+    tick() {}
+    field(name) {
+        return this.chunkData.field(name);
     }
 }
 
-},{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}]},["2dF6g","aRF0v"], "aRF0v", "parcelRequire94c2")
+},{"../utils/vector2d/immutable-vector2d.js":"amSYV","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}]},["3SUa7","aRF0v"], "aRF0v", "parcelRequire94c2")
 
 //# sourceMappingURL=main.js.map

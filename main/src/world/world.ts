@@ -1,35 +1,23 @@
 import { ImmutableVector2D } from "../utils/vector2d/immutable-vector2d.js";
 import { Vector2D } from "../utils/vector2d/vector2d.js";
-import { ChunkInstanceReferencer } from "./block-fields/chunk-instance-referencer.js";
+import { ImmutableVector3D } from "../utils/vector3d/immutable-vector3d.js";
 import { ChunkDataAllocator } from "./chunk-data/chunk-data-allocator.js";
-import { ChunkDataOptions } from "./chunk-data/chunk-data-options.js";
 import { ChunkDataReferencer } from "./chunk-data/chunk-data-referencer.js";
 import { Chunk } from "./chunk.js";
 import { Entity } from "./entity.js";
 
 export class World {
-    chunkSize = { chunkWidth: 16, chunkHeight: 64, chunkDepth: 16 };
     referencer: ChunkDataReferencer;
-    _entityIdMapping: Map<string, Entity>;
-    _chunks: Map<string, Chunk>;
-    _chunkDataOptions: ChunkDataOptions;
+    entityIdMapping: Map<string, Entity>;
+    chunks: Map<string, Chunk>;
 
-    constructor() {
-        this._entityIdMapping = new Map();
-        this._chunks = new Map();
-        this.referencer = new ChunkDataReferencer(this.chunkSize);
-    }
-
-    createAllocator() {
-        const allocator = new ChunkDataAllocator({ referencer: this.referencer });
-
-        ChunkInstanceReferencer.allocate(allocator);
-
-        return allocator;
-    }
-
-    useAllocation(allocator: ChunkDataAllocator) {
-        this._chunkDataOptions = allocator.generateOptions();
+    constructor(
+        public allocator: ChunkDataAllocator = new ChunkDataAllocator(),
+        public chunkSize: ImmutableVector3D = new ImmutableVector3D(16, 64, 16)
+    ) {
+        this.entityIdMapping = new Map();
+        this.chunks = new Map();
+        this.referencer = new ChunkDataReferencer(chunkSize);
     }
 
     createChunk(x: number | Vector2D, z?: number) {
@@ -54,15 +42,15 @@ export class World {
             x = x.x;
         }
         
-        return this._chunks.get(x + '.' + z) || null;
+        return this.chunks.get(x + '.' + z) || null;
     }
 
     addEntity(entity: Entity) {
-        this._entityIdMapping.set(entity.id, entity);
+        this.entityIdMapping.set(entity.id, entity);
 
         const chunk = this.getChunk(
-            Math.floor(entity.position.x / this.chunkSize.chunkWidth),
-            Math.floor(entity.position.z / this.chunkSize.chunkDepth)
+            Math.floor(entity.position.x / this.chunkSize.x),
+            Math.floor(entity.position.z / this.chunkSize.z)
         );
 
         if (!chunk) {
@@ -80,11 +68,11 @@ export class World {
     removeEntity(entity: Entity) {
         entity._leaveWorld();
 
-        this._entityIdMapping.delete(entity.id);
+        this.entityIdMapping.delete(entity.id);
     }
 
     _validateDisconnectedEntities() {
-        for (const entity of this._entityIdMapping.values()) {
+        for (const entity of this.entityIdMapping.values()) {
             if (!entity.chunk) {
                 console.warn("Entity is not in a chunk\n", entity);
             }
@@ -92,11 +80,13 @@ export class World {
     }
 
     tick() {
-        for (const entity of this._entityIdMapping.values()) {
+        for (const entity of this.entityIdMapping.values()) {
             entity.tick();
         }
 
-        for (const chunk of this.)
+        for (const [ _id, chunk ] of this.chunks) {
+            chunk.tick();
+        }
 
         this._validateDisconnectedEntities();
     }

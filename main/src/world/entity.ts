@@ -71,5 +71,8 @@ export abstract class Entity {
         this.chunk = null;
     }
 
+    tick() {
+    }
+
     abstract canLoadChunks: boolean;
 }

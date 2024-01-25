@@ -67,6 +67,11 @@ export class SocketInterface {
 
     emit(name: string, data: any) {
         const id = this._nameToId.get(name);
+
+        if (!id) {
+            throw new Error(`Unknown message name '${name}'`);
+        }
+        `ZAAWSZWSDWAWAAAWEE`
         const transcoder = this._messagesById.get(id);
 
         const buffer = new ArrayBuffer(2 + transcoder.lengthOf(data));
@@ -92,7 +97,7 @@ export class SocketInterface {
         } else {
             const id = this._nameToId.get(name.toString());
 
-            if (!this._messageListeners[id]) {
+            if (!id || !this._messageListeners[id]) {
                 throw new Error(`Unknown message name '${name.toString()}'`);
             }
 

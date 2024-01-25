@@ -1,59 +1,46 @@
 import { ImmutableVector2D } from "../utils/vector2d/immutable-vector2d.js";
-import { ChunkDataBits } from "./chunk-data/chunk-data-bits.js";
-import { ChunkDataBuffer } from "./chunk-data/chunk-data-buffer.js";
 import { ChunkDataField } from "./chunk-data/chunk-data-field.js";
-import { ChunkDataMap } from "./chunk-data/chunk-data-map.js";
+import { ChunkData } from "./chunk-data/chunk-data.js";
 import { Entity } from "./entity.js";
 import { World } from "./world.js";
 
 export class Chunk {
-    world: World;
+    _world: World | null;
     position: ImmutableVector2D;
     _entities: Set<Entity>;
-    _bits: ChunkDataBits;
-    _buffers: ChunkDataBuffer[];
-    _map: ChunkDataMap;
-    _fields: Map<string, ChunkDataField>;
+    chunkData: ChunkData;
 
     constructor() {
-        this.world = null;
-        this.position = null;
+        this._world = null;
+        this.position = new ImmutableVector2D();
 
         this._entities = new Set();
+    }
 
-        this._bits = null;
-        this._buffers = [];
-        this._map = null;
-        this._fields = new Map();
+    get world(): World {
+        if (!this._world) throw new Error(`Chunk is not in a world`);
+
+        return this._world;
+    }
+
+    set world(world: World) {
+        this._world = world;
     }
 
     _unload() {
         for (const entity of this._entities) {
-            this.world._entityIdMapping.delete(entity.id);
+            this.world.entityIdMapping.delete(entity.id);
         }
     }
 
     _setup() {
-        const { bits, buffers, map, fields } = this.world._chunkDataOptions;
-
-        if (bits) {
-            this._bits = new ChunkDataBits(bits);
-        }
-
-        if (map) {
-            this._map = new ChunkDataMap(map);
-        }
-
-        for (const buffer of buffers) {
-            this._buffers.push(new ChunkDataBuffer(buffer));
-        }
-
-        for (const field of fields) {
-            this._fields.set(field.label, new ChunkDataField(field.index, field.label, field.type, this));
-        }
+        this.chunkData.fields ||= this.world.allocator.initialize();
     }
 
-    field(name: string) {
-        return this._fields.get(name);
+    tick() {
+    }
+
+    field(name: string): ChunkDataField<any> {
+        return this.chunkData.field(name);
     }
 }
