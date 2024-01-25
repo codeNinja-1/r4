@@ -4,6 +4,8 @@ The **Chunk Data API** stores block data in an extensible and memory efficient w
 
 ## Class: `ChunkDataReferencer`
 
+> **Status:** Implemented
+
 A `ChunkDataReferencer` converts between indexes and positions in chunk data for given chunk dimensions.
 
 ### Typings
@@ -13,6 +15,7 @@ class ChunkDataReferencer {
     constructor(dimensions: Vector3D)
 
     get cells(): number
+    get dimensions(): Vector3D;
 
     index(x: number, y: number, z: number): number
 
@@ -79,15 +82,35 @@ Computes the position of a specified chunk data index. Equivalent to calling `x(
 position(index: number): Vector3D
 ```
 
+### Properties
+
+#### `get cells`
+
+Returns the total number of cells in a chunk.
+
+```ts
+get cells(): number;
+```
+
+#### `get dimensions`
+
+Returns the dimensions of a chunk as a vector.
+
+```ts
+get cells(): Vector3D;
+```
+
 ## Class: `ChunkDataAllocator`
+
+> **Status:** Implemented
 
 The `ChunkDataAllocator` allows multiple fields to be allocated before creating chunks.
 
 ```js
 class ChunkDataAllocator {
     constructor();
-    allocate(id: string, type: string);
-    get fields(): Iterable<ChunkDataFieldAllocation>;
+    allocate(name: string, field: ChunkDataFieldAllocation);
+    initialize(): Map<string, ChunkDataField>;
 }
 ```
 
@@ -97,43 +120,31 @@ class ChunkDataAllocator {
 Creates a new `ChunkDataAllocator` with a blank set of field allocations.
 
 ### Methods
-#### `allocate(id, type)`
+#### `allocate(id, field)`
 
-Allocates a new field under a given identifier.
+Allocates a new `ChunkDataFieldAllocation` under a given identifier.
 
 ```ts
-allocate(id: string, type: string)
+allocate(id: string, field: ChunkDataFieldAllocation)
 ```
 
-The `type` parameter can have one of the following values.
+#### `initialize()`
 
-| Representation | 1 Bit | 4 Bits | 1 Byte | 2 Bytes | 4 Bytes | 8 Bytes | Unspecified Length |
-|-|-|-|-|-|-|-|-|
-| Boolean | `boolean` | | | | | | |
-| Unsigned Integer | | `u4` | `u8` | `u16` | `u32` | | |
-| Signed Integer | | `i4` | `i8` | `i16` | `i32` | | |
-| Floating Point | | | | | `f32` | `f64` | |
-| Any Data Type     | | | | | | | `object` |
-
-### Properties
-#### `fields`
-
-The `fields` property contains the list of allocated `ChunkDataFieldAllocation` objects.
+Initializes all of the field allocations and outputs them as a map.
 
 ```ts
-get fields(): Iterable<ChunkDataFieldAllocation>
+initialize(): Map<string, ChunkDataField>;
 ```
 
 ## Class: `ChunkDataFieldAllocation`
+
+> **Status:** Base class implemented
 
 A `ChunkDataFieldAllocation` describes a field that will be created in each chunk loaded.
 
 ```js
 abstract class ChunkDataFieldAllocation<RepresentedType> {
-    id: string;
-
-    constructor(id: string);
-    abstract get type(): string;
+    constructor();
     abstract instantiate(): ChunkDataField<RepresentedType>;
 }
 ```
@@ -141,13 +152,12 @@ abstract class ChunkDataFieldAllocation<RepresentedType> {
 ### Generic Parameters
 #### `RepresentedType`
 
-The type of data that this field represents and the data type used when calling `get()`
-and `set()` on an instance of this field.
+The type of data that this field represents and the data type used when calling `get()` and `set()` on an instance of this field.
 
 ### Constructor
-#### `new ChunkDataFieldAllocation(id)`
+#### `new ChunkDataFieldAllocation()`
 
-Creates a new allocation with a given identifier.
+Creates a new allocation.
 
 ### Abstract Methods
 #### `instantiate()`
@@ -158,38 +168,26 @@ Instantiates and returns a data field to be stored in a `ChunkData` object.
 abstract instantiate(): ChunkDataField<RepresentedType>
 ```
 
-### Abstract Properties
-#### `type`
-
-The name of the data type (e.g. `i32`) used by the field.
-
-```ts
-abstract get type(): string;
-```
-
-### Subclasses
+### Implementations
 
 #### `ChunkDataBitAllocation`
 
 Represents a field of the type `boolean`.
 
 ```js
-class ChunkDataBitAllocation extends ChunkDataFieldAllocation<boolean> {
-    type: 'boolean';
-
-    constructor(id: string);
+class ChunkDataBitAllocation implements ChunkDataFieldAllocation<boolean> {
 }
 ```
 
-#### `ChunkDataBytesAllocation`
+#### `ChunkDataNumberAllocation`
 
 Represents a field for any size of `number`.
 
 ```js
-class ChunkDataBytesAllocation extends ChunkDataFieldAllocation<number> {
+class ChunkDataNumberAllocation implements ChunkDataFieldAllocation<number> {
     type: 'u4' | 'u8' | 'u16' | 'u32' | 'i4' | 'i8' | 'i16' | 'i32' | 'f32' | 'f64';
 
-    constructor(id: string);
+    constructor(type: string);
 }
 ```
 
@@ -198,23 +196,24 @@ class ChunkDataBytesAllocation extends ChunkDataFieldAllocation<number> {
 Represents a field for any serializable data type.
 
 ```js
-class ChunkDataObjectAllocation<RepresentedType> extends ChunkDataFieldAllocation<RepresentedType> {
-    constructor(id: string, dataType: DataType<RepresentedType>);
+class ChunkDataObjectAllocation<RepresentedType> implements ChunkDataFieldAllocation<RepresentedType> {
+    dataType: DataType<RepresentedType>;
 
-    get type(): 'object';
+    constructor(dataType: DataType<RepresentedType>);
 }
 ```
 
 ## Class: `ChunkDataField`
 
-A `ChunkDataField` is an object where data for the field can be contained. It
-requires methods to get and set values at positions.
+> **Status:** Implemented
+
+A `ChunkDataField` is an object where data for the field can be contained. It requires methods to get and set values at positions.
 
 ```js
 abstract class ChunkDataField<RepresentedType> {
-    id: Identifier;
+    constructor();
 
-    constructor(id: Identifier);
+    chunkData: ChunkData;
 
     get(position: Vector3D): RepresentedType;
     get(index: number): RepresentedType;
@@ -226,8 +225,63 @@ abstract class ChunkDataField<RepresentedType> {
 
     abstract _get(index: number): RepresentedType;
     abstract _set(index: number, value: RepresentedType): void;
-    abstract get type(): string;
 }
+```
+
+### Generic Parameters
+#### `RepresentedType`
+
+The type of data that this field represents and the data type used when calling `get()` and `set()` on an instance of this field.
+
+### Constructor
+#### `new ChunkDataField()`
+
+Creates a new field.
+
+### Methods
+#### `get(position)`
+
+Gets the value of the field at a given position.
+
+```ts
+get(position: Vector3D): RepresentedType;
+get(index: number): RepresentedType;
+get(x: number, y: number, z: number): RepresentedType;
+```
+
+#### `set(position, value)`
+
+Sets the value of the field at a given position.
+
+```ts
+set(position: Vector3D, value: RepresentedType): void;
+set(index: number, value: RepresentedType): void;
+set(x: number, y: number, z: number, value: RepresentedType): void;
+```
+
+#### `_get(index)`
+
+Gets the value of the field at a given index.
+
+```ts
+_get(index: number): RepresentedType;
+```
+
+#### `_set(index, value)`
+
+Sets the value of the field at a given index.
+
+```ts
+_set(index: number, value: RepresentedType): void;
+```
+
+### Properties
+#### `chunkData`
+
+The `ChunkData` object that this field is contained in.
+
+```ts
+chunkData: ChunkData;
 ```
 
 ### Subclasses
@@ -235,39 +289,32 @@ abstract class ChunkDataField<RepresentedType> {
 #### `ChunkDataBitField`
 
 ```js
-class ChunkDataBitField extends ChunkDataFieldAllocation<boolean> {
-    type: 'boolean';
-
-    constructor(id: Indentifier);
+class ChunkDataBitField extends ChunkDataField<boolean> {
+    constructor();
 }
 ```
 
 ```js
-class ChunkDataBytesAllocation extends ChunkDataFieldAllocation<number> {
+class ChunkDataNumberField extends ChunkDataField<number> {
     type: 'u4' | 'u8' | 'u16' | 'u32' | 'i4' | 'i8' | 'i16' | 'i32' | 'f32' | 'f64';
 
-    constructor(id: Indentifier);
+    constructor(type: 'u4' | 'u8' | 'u16' | 'u32' | 'i4' | 'i8' | 'i16' | 'i32' | 'f32' | 'f64');
 }
 ```
 
 ```js
-class ChunkDataObjectAllocation<T> extends ChunkDataFieldAllocation<T> {
-    id: Identifier;
-
-    constructor(id: Indentifier);
-
-    get type(): 'object';
+class ChunkDataObjectField<T> extends ChunkDataField<T> {
+    constructor();
 }
 ```
 
 ## Class: `ChunkData`
 
-The `ChunkData` class is an additional abstraction from the raw block data inside a chunk and
-the outer `Chunk` object which has references to the world and contains entities.
+The `ChunkData` class is an additional abstraction from the raw block data inside a chunk and the outer `Chunk` object which has references to the world and contains entities.
 
 ```js
 class ChunkData {
-    getDataField(id: Identifier): ChunkDataField {
-    }
+    referencer: ChunkDataReferencer;
+    field(id: string): ChunkDataField;
 }
 ```
