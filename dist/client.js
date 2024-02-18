@@ -761,6 +761,7 @@ class ChunkData {
     chunk = null;
     fields;
     entities = new Set();
+    updates = new Set();
     constructor() {
         this.fields = ChunkDataFields.initialize();
     }
@@ -782,7 +783,7 @@ class ChunkData {
         }
         return this.fields.get(id);
     }
-    getBlock(x, y, z) {
+    getBlockId(x, y, z) {
         if (x instanceof BlockPosition) {
             return this.getField('blockId').get(x.getGlobalPosition());
         }
@@ -792,23 +793,78 @@ class ChunkData {
         else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
             return this.getField('blockId').get(x, y, z);
         }
+        else if (typeof x === 'number') {
+            return this.getField('blockId').get(x);
+        }
+        else {
+            throw new Error("Invalid arguments");
+        }
+    }
+    getBlock(x, y, z) {
+        if (x instanceof BlockPosition) {
+            return Registries.blocks.get(this.getBlockId(x));
+        }
+        else if (x instanceof Vector3D) {
+            return Registries.blocks.get(this.getBlockId(x));
+        }
+        else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
+            return Registries.blocks.get(this.getBlockId(x, y, z));
+        }
+        else if (typeof x === 'number') {
+            return Registries.blocks.get(this.getBlockId(x));
+        }
+        else {
+            throw new Error("Invalid arguments");
+        }
+    }
+    setBlockId(x, y, z, block) {
+        if (x instanceof BlockPosition && typeof y == 'number') {
+            const localPostion = x.getLocalPosition();
+            this.setBlockId(localPostion, y);
+        }
+        else if (x instanceof Vector3D && typeof y === 'number') {
+            this.getField('blockId').set(x, y);
+            this.updates.add(ChunkDataReferencer.index(x));
+        }
+        else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number' && typeof block == 'number') {
+            this.getField('blockId').set(x, y, z, block);
+            this.updates.add(ChunkDataReferencer.index(x, y, z));
+        }
+        else if (typeof x == 'number' && typeof y == 'number') {
+            this.getField('blockId').set(x, y);
+            this.updates.add(x);
+        }
         else {
             throw new Error("Invalid arguments");
         }
     }
     setBlock(x, y, z, block) {
         if (x instanceof BlockPosition && y instanceof BlockPrototype) {
-            this.setBlock(x.getGlobalPosition(), y);
+            this.setBlockId(x, y.getBlockId());
         }
         else if (x instanceof Vector3D && y instanceof BlockPrototype) {
-            this.getField('blockId').set(x, y);
+            this.setBlockId(x, y.getBlockId());
         }
-        else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number' && block instanceof BlockPrototype) {
-            this.getField('blockId').set(x, y, z, block);
+        else if (typeof x === 'number' && typeof y == 'number' && typeof z == 'number' && block instanceof BlockPrototype) {
+            this.setBlockId(x, y, z, block.getBlockId());
+        }
+        else if (typeof x == 'number' && typeof y == 'number') {
+            this.setBlockId(x, y);
         }
         else {
             throw new Error("Invalid arguments");
         }
+    }
+    getBlockUpdates() {
+        return this.updates;
+    }
+    tickChunkData() {
+        for (const update of this.updates) {
+            const position = ChunkDataReferencer.position(update);
+            const blockPrototype = this.getBlock(position);
+            blockPrototype.whenTicked(new BlockPosition(position, this));
+        }
+        this.updates.clear();
     }
 }
 
@@ -867,6 +923,7 @@ class Chunk extends ChunkInterface.NonPlaceholder {
         this.chunkData = new ChunkData();
     }
     tickChunk() {
+        this.chunkData.tickChunkData();
     }
 }
 
@@ -1035,6 +1092,39 @@ class ChunkDataField {
 }
 
 /**
+ * Represents a field of the type `boolean`.
+ */
+class ChunkDataBitField extends ChunkDataField {
+    array;
+    constructor() {
+        super();
+        this.array = new Uint8Array(ChunkDataReferencer.cells / 8);
+    }
+    _get(index) {
+        const item = this.array[Math.floor(index / 8)];
+        return !!(item & (1 << (index % 8)));
+    }
+    _set(index, value) {
+        const item = this.array[Math.floor(index / 8)];
+        if (value) {
+            this.array[Math.floor(index / 8)] = item | (1 << (index % 8));
+        }
+        else {
+            this.array[Math.floor(index / 8)] = item & ~(1 << (index % 8));
+        }
+    }
+}
+
+/**
+ * Represents an allocation of a field of the type `boolean`.
+ */
+class ChunkDataBitAllocation {
+    instantiate() {
+        return new ChunkDataBitField();
+    }
+}
+
+/**
  * Represents a field for any size of `number`.
  */
 class ChunkDataNumberField extends ChunkDataField {
@@ -1137,32 +1227,53 @@ class ChunkInstanceReferencer {
         return ChunkDataReferencer.cells;
     }
     getGPUDataSize() {
-        return 2;
+        return 4;
+    }
+    *getUpdates(chunk) {
+        yield* chunk.getChunkData().getBlockUpdates();
     }
     getGPUData(chunk, index) {
         if (!chunk.getWorld())
             throw new Error("Rendered chunks should be in a world");
-        const array = new Uint16Array([index]);
+        const chunkData = chunk.getChunkData();
+        const field = chunkData.getField("blockId");
+        const array = new Uint16Array([index, field.get(index)]);
         return array.buffer;
     }
     getAddress(chunk, index) {
-        if (!chunk.getWorld())
-            throw new Error("Rendered chunks should be in a world");
-        const field = chunk.getChunkData().getField('instance_address');
-        if (!field) {
-            throw new Error("Instance address field not found.");
+        const hasField = chunk.getChunkData().getField('hasInstance');
+        const addressField = chunk.getChunkData().getField('instanceAddress');
+        if (!addressField || !hasField) {
+            throw new Error("Instance field not found.");
         }
-        return field.get(ChunkDataReferencer.x(index), ChunkDataReferencer.y(index), ChunkDataReferencer.z(index));
+        const x = ChunkDataReferencer.x(index);
+        const y = ChunkDataReferencer.y(index);
+        const z = ChunkDataReferencer.z(index);
+        if (!hasField.get(x, y, z))
+            return null;
+        return addressField.get(x, y, z);
     }
     setAddress(chunk, index, address) {
-        const field = chunk.getChunkData().getField('instanceAddress');
-        if (!field) {
-            throw new Error("Instance address field not found.");
+        const hasField = chunk.getChunkData().getField('hasInstance');
+        const addressField = chunk.getChunkData().getField('instanceAddress');
+        if (!addressField || !hasField) {
+            throw new Error("Instance field not found.");
         }
-        field.set(ChunkDataReferencer.x(index), ChunkDataReferencer.y(index), ChunkDataReferencer.z(index), address);
+        const x = ChunkDataReferencer.x(index);
+        const y = ChunkDataReferencer.y(index);
+        const z = ChunkDataReferencer.z(index);
+        hasField.set(x, y, z, address !== null);
+        if (address !== null)
+            addressField.set(x, y, z, address);
+    }
+    needsInstance(chunk, index) {
+        const blockPrototype = chunk.getChunkData().getBlock(index);
+        const blockPosition = new BlockPosition(ChunkDataReferencer.x(index), ChunkDataReferencer.y(index), ChunkDataReferencer.z(index), chunk.getChunkData());
+        return blockPrototype.isRendered(blockPosition);
     }
     static async setup() {
         Registries.fields.register('instanceAddress', new ChunkDataNumberAllocation('i16'));
+        Registries.fields.register('hasInstance', new ChunkDataBitAllocation());
     }
 }
 
@@ -1208,49 +1319,100 @@ class Game {
     }
 }
 
-/******************************************************************************
-Copyright (c) Microsoft Corporation.
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-***************************************************************************** */
-/* global Reflect, Promise, SuppressedError, Symbol */
-
-
-function __decorate(decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
+class RenderWorldMirror {
+    worldRenderer;
+    referencer = new ChunkInstanceReferencer();
+    chunks = new Map();
+    constructor(worldRenderer) {
+        this.worldRenderer = worldRenderer;
+    }
+    render() {
+        for (const [position, chunk] of this.chunks) {
+            chunk.renderChunk();
+        }
+    }
+    getInstanceReferencer() {
+        return this.referencer;
+    }
+    updateRenderedWorld() {
+        const world = this.worldRenderer.getWorld();
+        const perspective = this.worldRenderer.getPerspective();
+        const perspectiveLocation = perspective.getChunkLocation();
+        const renderDistance = perspective.getRenderDistance();
+        const renderDistanceSquared = renderDistance ** 2;
+        for (const [key, mirror] of this.chunks) {
+            const chunk = world.getChunk(mirror.getPosition());
+            if (!chunk)
+                continue;
+            if (chunk.isPlaceholder())
+                continue;
+            const chunkPosition = chunk.getPosition();
+            if (chunkPosition.distanceSquaredTo(perspectiveLocation) > renderDistanceSquared) {
+                this.chunks.delete(key);
+            }
+        }
+        for (let x = perspectiveLocation.x - renderDistance; x <= perspectiveLocation.x + renderDistance; x++) {
+            for (let z = perspectiveLocation.y - renderDistance; z <= perspectiveLocation.y + renderDistance; z++) {
+                const chunk = world.getChunk(x, z);
+                if (!chunk || chunk.isPlaceholder()) {
+                    continue;
+                }
+                const key = x + '.' + z;
+                const position = new ImmutableVector2D(x, z);
+                if (!this.chunks.has(key)) {
+                    this.chunks.set(key, this.worldRenderer.createRenderChunkMirror(position));
+                }
+            }
+        }
+    }
 }
-
-typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
-    var e = new Error(message);
-    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
-};
 
 class WorldRenderer {
 }
 
+class WebGPUChunkMirror {
+    position;
+    worldRenderer;
+    constructor(position, worldRenderer) {
+        this.position = position;
+        this.worldRenderer = worldRenderer;
+    }
+    renderChunk() {
+        // Not implemented
+    }
+    getPosition() {
+        return this.position;
+    }
+}
+
 class WebGPURenderer extends WorldRenderer {
+    renderer;
     canvas;
     context;
     world;
+    renderedWorld;
+    perspective;
+    constructor(renderer) {
+        super();
+        this.renderer = renderer;
+        this.canvas = document.createElement('canvas');
+        this.renderedWorld = new RenderWorldMirror(this);
+    }
     getCanvas() {
         return this.canvas;
     }
-    setRenderedWorld(world) {
+    getRenderer() {
+        return this.renderer;
+    }
+    setWorld(world) {
+        if (this.world)
+            throw new Error('Cannot set rendered world twice');
         this.world = world;
     }
-    async setupRenderer() {
+    getWorld() {
+        return this.world;
+    }
+    async setupWorldRenderer() {
         if (!navigator.gpu) {
             throw new Error('WebGPU is not supported');
         }
@@ -1268,51 +1430,54 @@ class WebGPURenderer extends WorldRenderer {
         });
     }
     render() {
+        this.renderedWorld.updateRenderedWorld();
+        this.renderedWorld.render();
     }
-    static supported = false;
-    static async checkSupport() {
-        if (!navigator.gpu) {
-            throw new Error('WebGPU is not supported');
-        }
-        const adapter = await navigator.gpu.requestAdapter();
-        if (!adapter) {
-            throw new Error('No useable adapter found');
-        }
-    }
-    static isSupported() {
-        return this.supported;
-    }
-}
-__decorate([
-    Game.init.schedule("checkWebGPUSupport", InitDispatcher.Timing.Cache)
-], WebGPURenderer, "checkSupport", null);
-
-class Renderer {
-    world;
-    perspective;
-    worldRenderer;
-    canvas;
-    constructor(world) {
-        this.world = world;
-    }
-    getCanvas() {
-        return this.canvas;
-    }
-    getWorld() {
-        return this.world;
+    renderChunk(position) {
+        // Not implemented
     }
     getPerspective() {
         return this.perspective;
     }
-    setupRenderer() {
-        if (WebGPURenderer.isSupported()) {
-            this.worldRenderer = new WebGPURenderer();
+    setPerspective(perspective) {
+        this.perspective = perspective;
+    }
+    createRenderChunkMirror(position) {
+        return new WebGPUChunkMirror(position, this);
+    }
+    static async isSupported() {
+        if (!navigator.gpu)
+            return false;
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter)
+            return false;
+        return true;
+    }
+}
+
+class Renderer {
+    world;
+    worldRenderer;
+    constructor(world) {
+        this.world = world;
+    }
+    getElement() {
+        if (!this.worldRenderer)
+            throw new Error('No world renderer set');
+        return this.worldRenderer.getCanvas();
+    }
+    getWorld() {
+        return this.world;
+    }
+    async setupRenderer() {
+        if (await WebGPURenderer.isSupported()) {
+            this.worldRenderer = new WebGPURenderer(this);
         }
         else {
             throw new Error("No supported world renderer found");
         }
-        this.worldRenderer.setupRenderer();
-        this.worldRenderer.setRenderedWorld(this.world);
+        this.worldRenderer.setupWorldRenderer();
+        this.worldRenderer.setWorld(this.world);
     }
 }
 
@@ -1375,6 +1540,6 @@ class Client extends Game {
 
 const client = new Client();
 await client.start();
-document.body.appendChild(client.getRenderer().getCanvas());
+document.body.appendChild(client.getRenderer().getElement());
 client.start();
 //# sourceMappingURL=client.js.map

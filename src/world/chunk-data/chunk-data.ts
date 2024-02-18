@@ -6,7 +6,6 @@ import { BlockPrototype } from "../prototype/block-prototype.js";
 import { BlockPosition } from "../prototype/block-position.js";
 import { Vector3D } from "../../utils/vector3d/vector3d.js";
 import { ChunkDataReferencer } from "./chunk-data-referencer.js";
-import { ChunkDataNumberField } from "./chunk-data-number-field.js";
 import { Registries } from "../../game/registries.js";
 
 export class ChunkData {
