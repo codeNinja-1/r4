@@ -1,0 +1,1 @@
+export enum GameRuntimeType { Singleplayer, MultiplayerClient, MultiplayerServer }

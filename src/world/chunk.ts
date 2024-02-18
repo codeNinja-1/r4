@@ -1,46 +1,58 @@
 import { ImmutableVector2D } from "../utils/vector2d/immutable-vector2d.js";
-import { ChunkDataField } from "./chunk-data/chunk-data-field.js";
+import { Vector2D } from "../utils/vector2d/vector2d.js";
 import { ChunkData } from "./chunk-data/chunk-data.js";
-import { Entity } from "./entity.js";
+import { ChunkInterface } from "./chunk-interface.js";
 import { World } from "./world.js";
 
-export class Chunk {
-    _world: World | null;
-    position: ImmutableVector2D;
-    _entities: Set<Entity>;
-    chunkData: ChunkData;
+export class Chunk extends ChunkInterface.NonPlaceholder {
+    private position: ImmutableVector2D;
+    private world: World | null = null;
+    private chunkData: ChunkData;
 
     constructor() {
-        this._world = null;
+        super();
+        
         this.position = new ImmutableVector2D();
-
-        this._entities = new Set();
     }
 
-    get world(): World {
-        if (!this._world) throw new Error(`Chunk is not in a world`);
-
-        return this._world;
+    setChunkData(chunkData: ChunkData): void {
+        this.chunkData = chunkData;
     }
 
-    set world(world: World) {
-        this._world = world;
+    getPosition(): Vector2D {
+        return this.position;
     }
 
-    _unload() {
-        for (const entity of this._entities) {
+    getWorld(): World {
+        if (!this.world) throw new Error("Cannot get world of unbound chunk");
+
+        return this.world;
+    }
+
+    getChunkData(): ChunkData {
+        return this.chunkData;
+    }
+
+    bindWorld(world: World, position: Vector2D) {
+        this.world = world;
+        this.position = new ImmutableVector2D(position.x, position.y);
+    }
+
+    unloadChunk() {
+        if (!this.world) throw new Error("Cannot unload unbound chunk");
+
+        for (const entity of this.chunkData.getEntities()) {
             this.world.entityIdMapping.delete(entity.id);
         }
     }
 
-    _setup() {
-        this.chunkData.fields ||= this.world.allocator.initialize();
+    setupChunk() {
+        if (!this.world) throw new Error("Cannot setup unbound chunk");
+
+        this.chunkData = new ChunkData();
     }
 
-    tick() {
-    }
-
-    field(name: string): ChunkDataField<any> {
-        return this.chunkData.field(name);
+    tickChunk() {
+        this.chunkData.tickChunkData();
     }
 }

@@ -1,62 +1,85 @@
-import { InstanceReferencer } from "../../render/model/instance-referencer.js";
-import { Chunk } from "../chunk.js";
-import { ChunkDataAllocator } from "../chunk-data/chunk-data-allocator.js";
+import { Registries } from "../../game/registries.js";
+import { InstanceReferencer } from "../../render/common/instance-referencer.js";
+import { ChunkDataBitAllocation } from "../chunk-data/chunk-data-bit-allocation.js";
+import { ChunkDataNumberAllocation } from "../chunk-data/chunk-data-number-allocation.js";
+import { ChunkDataReferencer } from "../chunk-data/chunk-data-referencer.js";
+import { ChunkInterface } from "../chunk-interface.js";
+import { BlockPosition } from "../prototype/block-position.js";
 
-export class ChunkInstanceReferencer implements InstanceReferencer<number> {
-    static instanceAddressField = 'instance_address';
-    instanceItemSize: number = 3;
-
-    constructor(public chunk: Chunk) {
-    }
-
+/**
+ * A `ChunkInstanceReferencer` stores the address in GPU memory of each represented block in a chunk.
+ * It also specifies the GPU data that should be sent to the GPU for each block (for now, just the position).
+ */
+export class ChunkInstanceReferencer implements InstanceReferencer {
     getChunkSize(): number {
-        return this.chunk.world.referencer.cells;
+        return ChunkDataReferencer.cells;
     }
 
-    getData(id: number): ArrayBuffer {
-        if (!this.chunk.world) throw new Error("Rendered chunks should be in a world");
+    getGPUDataSize(): number {
+        return 4;
+    }
 
-        const array = new Uint8Array(3);
+    *getUpdates(chunk: ChunkInterface.NonPlaceholder): Iterable<number> {
+        yield* chunk.getChunkData().getBlockUpdates();
+    }
 
-        array[0] = this.chunk.world.referencer.x(id);
-        array[1] = this.chunk.world.referencer.y(id);
-        array[2] = this.chunk.world.referencer.z(id);
+    getGPUData(chunk: ChunkInterface.NonPlaceholder, index: number): ArrayBuffer {
+        if (!chunk.getWorld()) throw new Error("Rendered chunks should be in a world");
+
+        const chunkData = chunk.getChunkData();
+        const field = chunkData.getField("blockId");
+        const array = new Uint16Array([ index, field.get(index) ]);
 
         return array.buffer;
     }
 
-    getAddress(id: number): number {
-        if (!this.chunk.world) throw new Error("Rendered chunks should be in a world");
+    getAddress(chunk: ChunkInterface.NonPlaceholder, index: number): number | null {
+        const hasField = chunk.getChunkData().getField('hasInstance');
+        const addressField = chunk.getChunkData().getField('instanceAddress');
 
-        const field = this.chunk.field(ChunkInstanceReferencer.instanceAddressField);
-
-        if (!field) {
-            throw new Error("Instance address field not found.");
+        if (!addressField || !hasField) {
+            throw new Error("Instance field not found.");
         }
 
-        return field.get(
-                this.chunk.world.referencer.x(id),
-                this.chunk.world.referencer.y(id),
-                this.chunk.world.referencer.z(id)
-            );
+        const x = ChunkDataReferencer.x(index);
+        const y = ChunkDataReferencer.y(index);
+        const z = ChunkDataReferencer.z(index);
+
+        if (!hasField.get(x, y, z)) return null;
+
+        return addressField.get(x, y, z);
     }
 
-    setAddress(id: number, address: number): void {
-        const field = this.chunk.field(ChunkInstanceReferencer.instanceAddressField);
+    setAddress(chunk: ChunkInterface.NonPlaceholder, index: number, address: number | null): void {
+        const hasField = chunk.getChunkData().getField('hasInstance');
+        const addressField = chunk.getChunkData().getField('instanceAddress');
 
-        if (!field) {
-            throw new Error("Instance address field not found.");
+        if (!addressField || !hasField) {
+            throw new Error("Instance field not found.");
         }
 
-        field.set(
-            this.chunk.world.referencer.xOfIndex(id),
-            this.chunk.world.referencer.yOfIndex(id),
-            this.chunk.world.referencer.zOfIndex(id),
-            address
+        const x = ChunkDataReferencer.x(index);
+        const y = ChunkDataReferencer.y(index);
+        const z = ChunkDataReferencer.z(index);
+
+        hasField.set(x, y, z, address !== null);
+        if (address !== null) addressField.set(x, y, z, address);
+    }
+
+    needsInstance(chunk: ChunkInterface.NonPlaceholder, index: number): boolean {
+        const blockPrototype = chunk.getChunkData().getBlock(index);
+        const blockPosition = new BlockPosition(
+            ChunkDataReferencer.x(index),
+            ChunkDataReferencer.y(index),
+            ChunkDataReferencer.z(index),
+            chunk.getChunkData()
         );
+
+        return blockPrototype.isRendered(blockPosition);
     }
 
-    static allocate(allocator: ChunkDataAllocator) {
-        return allocator.allocate('u16', ChunkInstanceReferencer.instanceAddressField);
+    static async setup() {
+        Registries.fields.register('instanceAddress', new ChunkDataNumberAllocation('i16'));
+        Registries.fields.register('hasInstance', new ChunkDataBitAllocation());
     }
 }

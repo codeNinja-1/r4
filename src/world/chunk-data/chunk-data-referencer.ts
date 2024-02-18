@@ -1,3 +1,4 @@
+import { ImmutableVector3D } from "../../utils/vector3d/immutable-vector3d.js";
 import { MutableVector3D } from "../../utils/vector3d/mutable-vector3d.js";
 import { Vector3D } from "../../utils/vector3d/vector3d.js";
 
@@ -16,25 +17,16 @@ import { Vector3D } from "../../utils/vector3d/vector3d.js";
  * in a chunk, equal to `dimensions.x * dimensions.y *
  * dimensions.z`.
  */
-export class ChunkDataReferencer {
+export abstract class ChunkDataReferencer {
     /**
      * The dimensions of the chunk as a 3D vector.
      */
-    public dimensions: Vector3D;
-
-    /**
-     * Creates a new `ChunkDataReferencer` using the
-     * chunk dimensions passed in through the first
-     * argument.
-     */
-    constructor(dimensions: Vector3D) {
-        this.dimensions = dimensions;
-    }
+    static dimensions: Vector3D = new ImmutableVector3D(8, 8, 32);
 
     /**
      * Returns the total number of cells in a chunk.
      */
-    get cells() {
+    static get cells() {
         return this.dimensions.x * this.dimensions.y * this.dimensions.z;
     }
 
@@ -46,9 +38,9 @@ export class ChunkDataReferencer {
      * 
      * The method is the opposite of `position()`.
      */
-    index(x: number, y: number, z: number): number;
-    index(x: Vector3D): number;
-    index(x: number | Vector3D, y?: number, z?: number): number {
+    static index(x: number, y: number, z: number): number;
+    static index(x: Vector3D): number;
+    static index(x: number | Vector3D, y?: number, z?: number): number {
         if (x instanceof Vector3D) {
             y = x.y;
             z = x.z;
@@ -68,7 +60,7 @@ export class ChunkDataReferencer {
      * `z()` methods to get the complete position
      * without creating a vector.
      */
-    x(index: number): number {
+    static x(index: number): number {
         return index % this.dimensions.x;
     }
 
@@ -78,7 +70,7 @@ export class ChunkDataReferencer {
      * and `z()` methods to get the complete position
      * without creating a vector.
      */
-    y(index: number): number {
+    static y(index: number): number {
         return Math.floor(index / this.dimensions.x) % this.dimensions.y;
     }
 
@@ -88,7 +80,7 @@ export class ChunkDataReferencer {
      * `y()` methods to get the complete position
      * without creating a vector.
      */
-    z(index: number): number {
+    static z(index: number): number {
         return Math.floor(index / (this.dimensions.x * this.dimensions.y));
     }
 
@@ -100,7 +92,7 @@ export class ChunkDataReferencer {
      * 
      * The method is the opposite of `index()`.
      */
-    position(index: number): Vector3D {
+    static position(index: number): Vector3D {
         return new MutableVector3D(this.x(index), this.y(index), this.z(index));
     }
 }

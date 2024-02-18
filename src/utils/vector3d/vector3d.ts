@@ -25,7 +25,7 @@ export abstract class Vector3D {
 
     add(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return this._set(this.x + x, this.y + y, this.z + z);
             } else {
                 return this._set(this.x + x, this.y + x, this.z + x);
@@ -37,7 +37,7 @@ export abstract class Vector3D {
 
     subtract(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return this._set(this.x - x, this.y - y, this.z - z);
             } else {
                 return this._set(this.x - x, this.y - x, this.z - x);
@@ -49,7 +49,7 @@ export abstract class Vector3D {
 
     reverseSubtract(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return this._set(x - this.x, y - this.y, z - this.z);
             } else {
                 return this._set(x - this.x, x - this.y, x - this.z);
@@ -61,7 +61,7 @@ export abstract class Vector3D {
 
     complexMultiply(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return this._set(this.x * x - this.y * y, this.x * y + this.y * x, this.z * z);
             } else {
                 return this._set(this.x * x, this.y * x, this.z * x);
@@ -73,7 +73,7 @@ export abstract class Vector3D {
 
     scalarMultiply(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return this._set(this.x * x, this.y * y, this.z * z);
             } else {
                 return this._set(this.x * x, this.y * x, this.z * x);
@@ -85,7 +85,7 @@ export abstract class Vector3D {
 
     scalarDivide(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return this._set(this.x / x, this.y / y, this.z / z);
             } else {
                 return this._set(this.x / x, this.y / x, this.z / x);
@@ -97,19 +97,21 @@ export abstract class Vector3D {
 
     reverseScalarDivide(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return this._set(x / this.x, y / this.y, this.z / z);
-            } else {
+            } else if (typeof z == 'number') {
                 return this._set(x / this.x, x / this.y, this.z / z);
+            } else {
+                throw new Error("Invalid syntax");
             }
-        } else {
-            return this._set(x.x / this.x, x.y / this.y, this.z / z);
+        } else if (typeof z == 'number') {
+            return this._set(x.x / this.x, x.y / this.y, x.z / this.z);
         }
     }
 
     dot(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return this.x * x + this.y * y + this.z * z;
             } else {
                 return this.x * x + this.y * x + this.z * x;
@@ -129,7 +131,7 @@ export abstract class Vector3D {
 
     distanceTo(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return Math.sqrt(this.distanceSquaredTo(x, y, z));
             } else {
                 return Math.sqrt(this.distanceSquaredTo(x, x, x));
@@ -141,7 +143,7 @@ export abstract class Vector3D {
 
     distanceSquaredTo(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
-            if (typeof y === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
                 return (this.x - x) ** 2 + (this.y - y) ** 2 + (this.z - z) ** 2;
             } else {
                 return (this.x - x) ** 2 + (this.y - x) ** 2 + (this.z - x) ** 2;
@@ -164,28 +166,17 @@ export abstract class Vector3D {
         return `${this.constructor.name} { ${this.x}, ${this.y} }`;
     }
 
-    immutable() {
-        return new ImmutableVector3D(this.x, this.y, this.z);
-    }
-
-    mutable() {
-        return new MutableVector3D(this.x, this.y, this.z);
-    }
-
     clone() {
-        if (this instanceof MutableVector3D) return new MutableVector3D(this.x, this.y, this.z);
-        if (this instanceof ImmutableVector3D) return new ImmutableVector3D(this.x, this.y, this.z);
-        if (this instanceof HandleableVector3D) return new HandleableVector3D(this.x, this.y, this.z);
-        throw new Error(`Unknown vector type: ${this.constructor.name}`);
-    }
-
-    handle() {
-        return new HandleableVector3D(this.x, this.y, this.z);
+        return new (this.constructor as new (x: number, y: number, z: number) => Vector3D)(this.x, this.y, this.z);
     }
 
     static *_from(vector: Vector2D, format: string) {
         yield format[0] == 'x' ? vector.x : format[0] == 'y' ? vector.y : format[0] == '1' ? 1 : 0;
         yield format[1] == 'x' ? vector.x : format[1] == 'y' ? vector.y : format[1] == '1' ? 1 : 0;
         yield format[2] == 'x' ? vector.x : format[2] == 'y' ? vector.y : format[2] == '1' ? 1 : 0;
+    }
+
+    equals(other: Vector3D) {
+        return this.x == other.x && this.y == other.y && this.z == other.z;
     }
 }

@@ -1,23 +1,24 @@
 import { ImmutableVector2D } from "../utils/vector2d/immutable-vector2d.js";
 import { Vector2D } from "../utils/vector2d/vector2d.js";
-import { ImmutableVector3D } from "../utils/vector3d/immutable-vector3d.js";
-import { ChunkDataAllocator } from "./chunk-data/chunk-data-allocator.js";
 import { ChunkDataReferencer } from "./chunk-data/chunk-data-referencer.js";
+import { ChunkInterface } from "./chunk-interface.js";
 import { Chunk } from "./chunk.js";
 import { Entity } from "./entity.js";
+import { PlaceholderChunk } from "./placeholder-chunk.js";
+import { WorldLoader } from "./world-loader.js";
 
 export class World {
-    referencer: ChunkDataReferencer;
     entityIdMapping: Map<string, Entity>;
-    chunks: Map<string, Chunk>;
+    private chunks: Map<string, ChunkInterface>;
+    private loader: WorldLoader;
 
-    constructor(
-        public allocator: ChunkDataAllocator = new ChunkDataAllocator(),
-        public chunkSize: ImmutableVector3D = new ImmutableVector3D(16, 64, 16)
-    ) {
+    constructor() {
         this.entityIdMapping = new Map();
         this.chunks = new Map();
-        this.referencer = new ChunkDataReferencer(chunkSize);
+    }
+
+    bindWorldLoader(loader: WorldLoader) {
+        this.loader = loader;
     }
 
     createChunk(x: number | Vector2D, z?: number) {
@@ -28,10 +29,8 @@ export class World {
 
         const chunk = new Chunk();
 
-        chunk.world = this;
-        chunk.position = new ImmutableVector2D(x, z);
-
-        chunk._setup();
+        chunk.bindWorld(this, new ImmutableVector2D(x, z));
+        chunk.setupChunk();
 
         return chunk;
     }
@@ -49,18 +48,22 @@ export class World {
         this.entityIdMapping.set(entity.id, entity);
 
         const chunk = this.getChunk(
-            Math.floor(entity.position.x / this.chunkSize.x),
-            Math.floor(entity.position.z / this.chunkSize.z)
+            Math.floor(entity.position.x / ChunkDataReferencer.dimensions.x),
+            Math.floor(entity.position.z / ChunkDataReferencer.dimensions.z)
         );
 
         if (!chunk) {
             throw new Error("Cannot add entity to world: Chunk does not exist");
         }
 
-        chunk._entities.add(entity);
-
         entity._joinWorld(this);
-        entity._updateCurrentChunk(chunk);
+
+        if (!chunk.isPlaceholder()) {
+            chunk.getChunkData().addEntity(entity);
+            entity._updateCurrentChunk(null);
+        } else {
+            entity._updateCurrentChunk(chunk as ChunkInterface.NonPlaceholder);
+        }
 
         return entity;
     }
@@ -85,9 +88,56 @@ export class World {
         }
 
         for (const [ _id, chunk ] of this.chunks) {
-            chunk.tick();
+            chunk.tickChunk();
         }
 
         this._validateDisconnectedEntities();
+    }
+
+    loadChunk(x: number, z: number): ChunkInterface.Placeholder;
+    loadChunk(position: Vector2D): ChunkInterface.Placeholder;
+    loadChunk(x: Vector2D | number, z?: number): ChunkInterface.Placeholder {
+        let position: Vector2D;
+
+        if (typeof x === 'number') {
+            if (typeof z !== 'number') {
+                throw new Error("Invalid arguments");
+            } else {
+                position = new ImmutableVector2D(x, z);
+            }
+        } else {
+            position = new ImmutableVector2D(x.x, x.y);
+        }
+
+        if (this.getChunk(position)) {
+            throw new Error("Cannot load chunk where another chunk already exists");
+        }
+
+        if (!this.loader) {
+            throw new Error("Cannot load chunk: World has no loader");
+        }
+
+        const placeholder = new PlaceholderChunk();
+
+        this.chunks.set(position.x + '.' + position.y, placeholder);
+
+        this.loader.loadChunk(position).then(chunkData => {
+            const chunk = new Chunk();
+
+            chunk.bindWorld(this, position);
+            chunk.setChunkData(chunkData);
+
+            this.chunks.set(position.x + '.' + position.y, chunk);
+
+            for (const entity of this.entityIdMapping.values()) {
+                if (!entity.chunk) continue;
+
+                if (entity.chunk.getPosition().equals(position)) {
+                    entity._updateCurrentChunk(chunk);
+                }
+            }
+        });
+
+        return new PlaceholderChunk();
     }
 }

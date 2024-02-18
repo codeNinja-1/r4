@@ -1,4 +1,5 @@
 import { ChunkDataField } from "./chunk-data-field.js";
+import { ChunkDataReferencer } from "./chunk-data-referencer.js";
 
 /**
  * Represents a field of the type `boolean`.
@@ -9,7 +10,7 @@ export class ChunkDataBitField extends ChunkDataField<boolean> {
     constructor() {
         super();
 
-        this.array = new Uint8Array(this.chunkData.referencer.cells / 8);
+        this.array = new Uint8Array(ChunkDataReferencer.cells / 8);
     }
 
     _get(index: number) {

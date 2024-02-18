@@ -35,7 +35,7 @@ export class HandleableVector3D extends MutableVector3D {
         return super._set(x, y, z);
     }
 
-    clone() {
+    clone(): Vector3D {
         throw new Error("Cannot clone handleable vector. Instead use immutable() or mutable() to output a non-handlable vector.");
     }
 

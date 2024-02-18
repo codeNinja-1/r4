@@ -1,33 +1,41 @@
+import { GameRuntimeType } from "../game/game-runtime-type.js";
+import { Game } from "../game/game.js";
 import { Renderer } from "../render/renderer.js";
-import { Component } from "../view/component.js";
-import { DOM } from "../view/dom.js";
-import { World } from "../world/world.js";
+import { SimpleWorldGenerator } from "../world/world-generation/simple-world-generator.js";
+import { WorldGenerator } from "../world/world-generation/world-generator.js";
+import { WorldLoader } from "../world/world-loader.js";
+import { SingleplayerWorldLoader } from "./singleplayer-world-loader.js";
 
-export class Client extends Component {
-    _element: HTMLDivElement;
-    renderer: Renderer;
-    world: World;
+export class Client extends Game {
+    private renderer: Renderer;
+    private worldGenerator: WorldGenerator;
+    private worldLoader: WorldLoader;
 
     constructor() {
         super();
 
-        this.world = new World();
-        (this.element);
+        this.worldGenerator = new SimpleWorldGenerator();
+        this.worldLoader = new SingleplayerWorldLoader(this.worldGenerator);
+        this.getWorld().bindWorldLoader(this.worldLoader);
+
+        this.renderer = new Renderer(this.getWorld());
     }
 
-    init() {
+    getRenderer() {
+        return this.renderer;
+    }
+
+    getRuntimeType(): GameRuntimeType {
+        return GameRuntimeType.Singleplayer;
+    }
+
+    initGame(): void {
         
     }
 
-    render() {
-        const client = DOM.element('div', 'cubecraft-client', 'cubecraft-layers', 'cubecraft-screen');
+    async start() {
+        await super.start();
 
-        const canvas = DOM.element('canvas', 'cubecraft-client-canvas') as HTMLCanvasElement;
-
-        this.renderer = new Renderer(this.world, canvas);
-
-        client.appendChild(canvas);
-
-        return client;
+        this.renderer.setupRenderer();
     }
 }

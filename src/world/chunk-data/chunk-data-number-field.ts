@@ -1,5 +1,6 @@
 import { ChunkDataField } from "./chunk-data-field.js";
 import { ChunkDataNumberType } from "./chunk-data-number-type.js";
+import { ChunkDataReferencer } from "./chunk-data-referencer.js";
 import { TypedArray } from "./typed-array.js";
 
 /**
@@ -11,7 +12,7 @@ export class ChunkDataNumberField extends ChunkDataField<number> {
     constructor(public type: ChunkDataNumberType) {
         super();
 
-        this.array = ChunkDataNumberField.typedArray(type, this.chunkData.referencer.cells);
+        this.array = ChunkDataNumberField.typedArray(type, ChunkDataReferencer.cells);
     }
 
     _get(index: number): number {
@@ -48,6 +49,9 @@ export class ChunkDataNumberField extends ChunkDataField<number> {
         }
     }
 
+    /**
+     * Create a typed array of a given `ChunkDataNumberType` and length.
+     */
     static typedArray(type: ChunkDataNumberType, length: number): TypedArray {
         if (type == "u4") return new Uint8Array(length / 2);
         if (type == "u8") return new Uint8Array(length);

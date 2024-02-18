@@ -1,14 +1,16 @@
 import { Rotation } from "../utils/rotation/rotation.js";
+import { ImmutableVector2D } from "../utils/vector2d/immutable-vector2d.js";
 import { HandleableVector3D } from "../utils/vector3d/handleable-vector3d.js";
 import { MutableVector3D } from "../utils/vector3d/mutable-vector3d.js";
 import { Vector3D } from "../utils/vector3d/vector3d.js";
-import { Chunk } from "./chunk.js";
+import { ChunkDataReferencer } from "./chunk-data/chunk-data-referencer.js";
+import { ChunkInterface } from "./chunk-interface.js";
 import { World } from "./world.js";
 
 export abstract class Entity {
     id: string;
     position: HandleableVector3D;
-    chunk: Chunk | null;
+    chunk: ChunkInterface | null;
     world: World | null;
     velocity: Vector3D;
     rotation: Rotation;
@@ -21,17 +23,25 @@ export abstract class Entity {
             // If the entity is not in a world or chunk, it doesn't need to update it's chunk
             if (this.world && this.chunk) {
                 // Compute the location of the chunk the entity should be moved to.
-                const targetChunkX = Math.floor(this.position.x / this.world.chunkSize.chunkWidth);
-                const targetChunkZ = Math.floor(this.position.z / this.world.chunkSize.chunkDepth);
+                const targetChunkX = Math.floor(this.position.x / ChunkDataReferencer.dimensions.x);
+                const targetChunkZ = Math.floor(this.position.z / ChunkDataReferencer.dimensions.z);
 
                 // Get the location of the chunk object that currently contains the entity.
-                const currentChunkX = this.chunk.position.x;
-                const currentChunkZ = this.chunk.position.y;
+                const currentChunkPosition = this.chunk.getPosition();
+                const currentChunkX = currentChunkPosition.x;
+                const currentChunkZ = currentChunkPosition.y;
 
                 // Check if the entity should move to a different chunk.
                 if (currentChunkX != targetChunkX || currentChunkZ != targetChunkZ) {
+                    // Get the chunk that the entity should be in.
+                    let chunk = this.world.getChunk(targetChunkX, targetChunkZ);
+
+                    if (!chunk) {
+                        chunk = this.world.loadChunk(targetChunkX, targetChunkZ);;
+                    }
+
                     // Update the chunk the entity is in.
-                    this._updateCurrentChunk(this.world.getChunk(targetChunkX, targetChunkZ));
+                    this._updateCurrentChunk(chunk);
                 }
             }
         });
@@ -43,8 +53,8 @@ export abstract class Entity {
         this.chunk = null;
 
         // Compute the location of the chunk the entity should be placed in.
-        const targetChunkX = Math.floor(this.position.x / this.world.chunkSize.chunkWidth);
-        const targetChunkZ = Math.floor(this.position.z / this.world.chunkSize.chunkDepth);
+        const targetChunkX = Math.floor(this.position.x / ChunkDataReferencer.dimensions.x);
+        const targetChunkZ = Math.floor(this.position.z / ChunkDataReferencer.dimensions.z);
 
         // Get the chunk object that the entity should be placed in.
         let targetChunk = this.world.getChunk(targetChunkX, targetChunkZ);
@@ -60,10 +70,10 @@ export abstract class Entity {
         this._updateCurrentChunk(targetChunk);
     }
 
-    _updateCurrentChunk(chunk: Chunk | null) {
-        if (this.chunk) this.chunk._entities.delete(this);
+    _updateCurrentChunk(chunk: ChunkInterface | null) {
+        if (this.chunk && !this.chunk.isPlaceholder()) this.chunk.getChunkData().removeEntity(this);
         this.chunk = chunk;
-        if (this.chunk) this.chunk._entities.add(this);
+        if (this.chunk && !this.chunk.isPlaceholder()) this.chunk.getChunkData().addEntity(this);
     }
 
     _leaveWorld() {
