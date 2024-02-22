@@ -1,5 +1,5 @@
-import { Registries } from "../../game/registries.js";
-import { Registry } from "../../game/registry.js";
+import { Registries } from "../../game/registry/registries.js";
+import { Registry } from "../../game/registry/registry.js";
 import { ChunkDataField } from "../chunk-data/chunk-data-field.js";
 
 /**

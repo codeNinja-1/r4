@@ -1,12 +1,8 @@
-import { Game } from "../../game/game.js";
+import { IndexedRegistryItem } from "../../game/registry/indexed-registry-item.js";
+import { BlockModel } from "../../render/world/model/static/block-model.js";
 import { BlockPosition } from "./block-position.js";
 
-export abstract class BlockPrototype {
-    abstract getBlockId(): number;
-    abstract getBlockName(): string;
-    
-    abstract bindBlockReferences(id: number, name: string): void;
-
+export abstract class BlockPrototype extends IndexedRegistryItem {
     abstract instantiate(position: BlockPosition): void;
 
     abstract whenDestroyed(position: BlockPosition): void;
@@ -14,5 +10,7 @@ export abstract class BlockPrototype {
     abstract whenPlaced(position: BlockPosition): void;
     abstract whenTicked(position: BlockPosition): void;
 
-    abstract isRendered(position: BlockPosition): boolean;
+    abstract getBlockModel(position: BlockPosition): BlockModel | null;
+
+    abstract setup(): Promise<void>;
 }

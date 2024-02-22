@@ -11,12 +11,11 @@ export class Chunk extends ChunkInterface.NonPlaceholder {
 
     constructor() {
         super();
-        
-        this.position = new ImmutableVector2D();
     }
 
     setChunkData(chunkData: ChunkData): void {
         this.chunkData = chunkData;
+        this.chunkData.setParentChunk(this);
     }
 
     getPosition(): Vector2D {
@@ -42,7 +41,7 @@ export class Chunk extends ChunkInterface.NonPlaceholder {
         if (!this.world) throw new Error("Cannot unload unbound chunk");
 
         for (const entity of this.chunkData.getEntities()) {
-            this.world.entityIdMapping.delete(entity.id);
+            this.world.entityIdMapping.delete(entity.getUniqueId());
         }
     }
 

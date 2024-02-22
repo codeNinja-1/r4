@@ -1,15 +1,15 @@
-import { Chunk } from "../chunk.js";
-import { Entity } from "../entity.js";
+import { Registries } from "../../game/registry/registries.js";
+import { Vector3D } from "../../utils/vector3d/vector3d.js";
+import { ChunkInterface } from "../chunk-interface.js";
+import { Entity } from "../entity/entity.js";
+import { BlockPosition } from "../prototype/block-position.js";
+import { BlockPrototype } from "../prototype/block-prototype.js";
 import { ChunkDataFields } from "../prototype/chunk-data-fields.js";
 import { ChunkDataField } from "./chunk-data-field.js";
-import { BlockPrototype } from "../prototype/block-prototype.js";
-import { BlockPosition } from "../prototype/block-position.js";
-import { Vector3D } from "../../utils/vector3d/vector3d.js";
 import { ChunkDataReferencer } from "./chunk-data-referencer.js";
-import { Registries } from "../../game/registries.js";
 
 export class ChunkData {
-    private chunk: Chunk | null = null;
+    private chunk: ChunkInterface.NonPlaceholder | null = null;
     private fields: Map<string, ChunkDataField<any>>;
     private entities: Set<Entity> = new Set();
     private updates: Set<number> = new Set();
@@ -18,11 +18,15 @@ export class ChunkData {
         this.fields = ChunkDataFields.initialize();
     }
 
+    setParentChunk(chunk: ChunkInterface.NonPlaceholder): void {
+        this.chunk = chunk;
+    }
+
     getEntities(): Set<Entity> {
         return new Set(...this.entities.entries());
     }
 
-    getChunk(): Chunk | null {
+    getChunk(): ChunkInterface.NonPlaceholder | null {
         return this.chunk;
     }
 
@@ -78,7 +82,6 @@ export class ChunkData {
         }
     }
 
-
     setBlockId(position: BlockPosition, blockId: number): void;
     setBlockId(position: Vector3D, blockId: number): void;
     setBlockId(x: number, y: number, z: number, blockId: number): void;
@@ -110,11 +113,11 @@ export class ChunkData {
     setBlock(x: number, y: number, z: number, block: BlockPrototype): void;
     setBlock(x: BlockPosition | Vector3D | number, y: BlockPrototype | number, z?: number, block?: BlockPrototype): void {
         if (x instanceof BlockPosition && y instanceof BlockPrototype) {
-            this.setBlockId(x, y.getBlockId());
+            this.setBlockId(x, y.getRegisteredId());
         } else if (x instanceof Vector3D && y instanceof BlockPrototype) {
-            this.setBlockId(x, y.getBlockId());
+            this.setBlockId(x, y.getRegisteredId());
         } else if (typeof x === 'number' && typeof y == 'number' && typeof z == 'number' && block instanceof BlockPrototype) {
-            this.setBlockId(x, y, z, block.getBlockId());
+            this.setBlockId(x, y, z, block.getRegisteredId());
         } else if (typeof x == 'number' && typeof y == 'number') {
             this.setBlockId(x, y);
         } else {

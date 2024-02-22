@@ -1,6 +1,11 @@
+import { PlayerEntity } from "../content/entity/player/player-entity.js";
 import { GameRuntimeType } from "../game/game-runtime-type.js";
 import { Game } from "../game/game.js";
+import { Registries } from "../game/registry/registries.js";
+import { EntityPerspective } from "../render/world/pespective/entity-perspective.js";
+import { Projector } from "../render/world/pespective/projector.js";
 import { Renderer } from "../render/renderer.js";
+import { EntityPrototype } from "../world/prototype/entity-prototype.js";
 import { SimpleWorldGenerator } from "../world/world-generation/simple-world-generator.js";
 import { WorldGenerator } from "../world/world-generation/world-generator.js";
 import { WorldLoader } from "../world/world-loader.js";
@@ -29,13 +34,21 @@ export class Client extends Game {
         return GameRuntimeType.Singleplayer;
     }
 
-    initGame(): void {
-        
-    }
-
     async start() {
         await super.start();
+        await this.renderer.setupRenderer();
 
-        this.renderer.setupRenderer();
+        const playerPrototype = Registries.entities.get('player') as EntityPrototype<PlayerEntity>;
+        const playerEntity = playerPrototype.instantiate();
+
+        this.getWorld().addEntity(playerEntity);
+
+        const playerPerspective = new EntityPerspective(playerEntity);
+
+        this.getRenderer().getWorldRenderer().setPerspective(playerPerspective);
+
+        const clock = this.getClock();
+        clock.schedule(() => this.renderer.render());
+        clock.start();
     }
 }

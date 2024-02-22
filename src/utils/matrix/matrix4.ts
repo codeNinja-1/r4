@@ -1,9 +1,39 @@
+import { Rotation } from "../rotation/rotation.js";
 import { ImmutableVector3D } from "../vector3d/immutable-vector3d.js";
 import { MutableVector3D } from "../vector3d/mutable-vector3d.js";
 import { Vector3D } from "../vector3d/vector3d.js";
+import { Matrix3 } from "./matrix3.js";
 
 export class Matrix4 {
-    constructor(public data: number[] = [ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 ]) {
+    public data: number[];
+
+    constructor(source?: number[] | Matrix3 | Matrix4) {
+        if (source instanceof Matrix3) {
+            this.data = [
+                source.data[0], source.data[1], source.data[2], 0,
+                source.data[3], source.data[4], source.data[5], 0,
+                source.data[6], source.data[7], source.data[8], 0,
+                0, 0, 0, 1
+            ];
+        } else if (source instanceof Matrix4) {
+            this.data = source.data.map(item => item);
+        } else if (source) {
+            this.data = source.map(item => item);
+        } else {
+            this.data = [ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 ];
+        }
+    }
+
+    multiply(vector: Vector3D): Vector3D;
+    multiply(matrix: Matrix4): ThisType<Matrix4>;
+    multiply(value: Vector3D | Matrix4): Vector3D | ThisType<Matrix4> {
+        if (value instanceof Vector3D) {
+            return Matrix4.multiplyVector(this, value);
+        } else if (value instanceof Matrix4) {
+            return Matrix4.multiply(this, value, this);
+        } else {
+            throw new Error("Invalid arguments");
+        }
     }
 
     get translation(): Vector3D {
@@ -159,6 +189,16 @@ export class Matrix4 {
         target.data[15] = 1;
 
         return target;
+    }
+
+    static createRotation(rotation: Rotation, target: Matrix4 = new Matrix4()) {
+        let matrix = target || new Matrix4();
+
+        matrix.multiply(Matrix4.createRotationY(rotation.yaw));
+        matrix.multiply(Matrix4.createRotationX(rotation.pitch));
+        matrix.multiply(Matrix4.createRotationZ(rotation.roll));
+
+        return matrix;
     }
 
     static createRotationX(angle: number, target: Matrix4 = new Matrix4()) {

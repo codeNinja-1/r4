@@ -15,4 +15,22 @@ export class Rotation {
         this.pitch = pitch;
         this.roll = roll;
     }
+
+    set(yaw: number | Rotation, pitch?: number, roll?: number) {
+        if (typeof yaw == 'number' && typeof pitch === 'number' && typeof roll === 'number') {
+            this.yaw = yaw;
+            this.pitch = pitch;
+            this.roll = roll;
+        } else if (yaw instanceof Rotation && pitch === undefined && roll === undefined) {
+            this.yaw = yaw.yaw;
+            this.pitch = yaw.pitch;
+            this.roll = yaw.roll;
+        } else {
+            throw new Error('Invalid arguments to Rotation.set(), expected number, number, number or Rotation');
+        }
+    }
+
+    clone() {
+        return new Rotation(this.yaw, this.pitch, this.roll);
+    }
 }

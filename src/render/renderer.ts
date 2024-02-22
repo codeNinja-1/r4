@@ -1,11 +1,17 @@
 import { World } from "../world/world.js";
-import { WorldRenderer } from "./common/world-renderer.js";
-import { WebGPURenderer } from "./webgpu/webgpu-renderer.js";
+import { WorldRenderer } from "./world/world-renderer.js";
+import { WebGPURenderer } from "./world/implementation/webgpu/webgpu-renderer.js";
 
 export class Renderer {
     private worldRenderer: WorldRenderer | null;
 
     constructor(private world: World) {
+    }
+
+    getWorldRenderer(): WorldRenderer {
+        if (!this.worldRenderer) throw new Error('No world renderer set');
+
+        return this.worldRenderer;
     }
 
     getElement(): HTMLElement {
@@ -27,5 +33,11 @@ export class Renderer {
 
         this.worldRenderer.setupWorldRenderer();
         this.worldRenderer.setWorld(this.world);
+    }
+
+    render(): void {
+        if (!this.worldRenderer) throw new Error('No world renderer set');
+
+        this.worldRenderer.render();
     }
 }

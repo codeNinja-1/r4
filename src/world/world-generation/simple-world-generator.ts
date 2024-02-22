@@ -1,4 +1,4 @@
-import { Registries } from "../../game/registries.js";
+import { Registries } from "../../game/registry/registries.js";
 import { Vector2D } from "../../utils/vector2d/vector2d.js";
 import { ChunkDataReferencer } from "../chunk-data/chunk-data-referencer.js";
 import { ChunkData } from "../chunk-data/chunk-data.js";

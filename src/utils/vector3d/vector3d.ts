@@ -23,6 +23,18 @@ export abstract class Vector3D {
 
     abstract _set(x: number, y: number, z: number): Vector3D;
 
+    set(x: number | Vector3D, y?: number, z?: number) {
+        if (typeof x === 'number') {
+            if (typeof y === 'number' && typeof z === 'number') {
+                return this._set(x, y, z);
+            } else {
+                return this._set(x, x, x);
+            }
+        } else {
+            return this._set(x.x, x.y, x.z);
+        }
+    }
+
     add(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
             if (typeof y === 'number' && typeof z === 'number') {

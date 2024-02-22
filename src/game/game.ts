@@ -1,30 +1,30 @@
-import { EventClock } from "./event-clock.js";
-import { InitDispatcher } from "./init-dispatcher.js";
+import { loadGameContent } from "../content/content.js";
+import { ChunkDataNumberAllocation } from "../world/chunk-data/chunk-data-number-allocation.js";
 import { World } from "../world/world.js";
+import { EventClock } from "./event-clock.js";
 import { GameRuntimeType } from "./game-runtime-type.js";
-import { Registry } from "./registry.js";
-import { ChunkInstanceReferencer } from "../world/block-fields/chunk-instance-referencer.js";
-import { Registries } from "./registries.js";
+import { InitDispatcher } from "./init-dispatcher.js";
+import { Registries } from "./registry/registries.js";
 
 export abstract class Game {
     static init = new InitDispatcher();
-    private static instance: Game;
 
-    private _world: World;
-    private _clock: EventClock = new EventClock();
+    private world: World;
+    private clock: EventClock = new EventClock();
 
     constructor() {
-        this._world = new World();
+        this.world = new World();
     }
 
     async start() {
         await Game.init.run();
 
+        Registries.fields.register('blockId', new ChunkDataNumberAllocation('u16'));
         Registries.blocks.allocateBlockIds();
-        ChunkInstanceReferencer.setup();
+
+        await loadGameContent();
     }
     
-    abstract initGame(): void;
     abstract getRuntimeType(): GameRuntimeType;
 
     isGameClient(): boolean {
@@ -48,18 +48,10 @@ export abstract class Game {
     }
 
     getWorld(): World {
-        return this._world;
+        return this.world;
     }
 
     getClock(): EventClock {
-        return this._clock;
-    }
-
-    static _setMainInstance(instance: Game) {
-        Game.instance = instance;
-    }
-
-    static getInstance() {
-        return Game.instance;
+        return this.clock;
     }
 }

@@ -5,7 +5,11 @@ import { World } from "./world.js";
 
 export class PlaceholderChunk extends ChunkInterface.Placeholder {
     private position: Vector2D;
-    private world: World | null;
+    private world: World | null = null;
+
+    constructor() {
+        super();
+    }
 
     getPosition(): Vector2D {
         return this.position;
@@ -22,6 +26,8 @@ export class PlaceholderChunk extends ChunkInterface.Placeholder {
     }
 
     bindWorld(world: World, position: Vector2D): void {
+        this.world = world;
+        this.position = position;
     }
 
     unloadChunk(): void {}

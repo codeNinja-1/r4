@@ -37,14 +37,14 @@ export abstract class ChunkDataField<RepresentedType> {
     set(index: number, value: RepresentedType): void;
     set(x: number, y: number, z: number, value: RepresentedType): void;
     set(x: Vector3D | BlockPosition | number, y: RepresentedType | number, z?: number, value?: RepresentedType): void {
-        if (typeof x == 'number' && typeof y != 'number') {
-            return this._set(x, y);
-        } else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number' && typeof value != 'undefined') {
+        if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number' && typeof value != 'undefined') {
             return this._set(ChunkDataReferencer.index(x, y, z), value);
         } else if (x instanceof Vector3D && typeof y != 'number') {
             return this._set(ChunkDataReferencer.index(x), y);
         } else if (x instanceof BlockPosition && typeof y != 'number') {
             return this._set(ChunkDataReferencer.index(x.getLocalPosition()), y);
+        } else if (typeof x == 'number') {
+            return this._set(x, y as RepresentedType);
         } else {
             throw new Error("Invalid arguments");
         }

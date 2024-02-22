@@ -17,18 +17,21 @@ import { Vector3D } from "../../utils/vector3d/vector3d.js";
  * in a chunk, equal to `dimensions.x * dimensions.y *
  * dimensions.z`.
  */
-export abstract class ChunkDataReferencer {
+export namespace ChunkDataReferencer {
     /**
      * The dimensions of the chunk as a 3D vector.
      */
-    static dimensions: Vector3D = new ImmutableVector3D(8, 8, 32);
+    export const dimensions: Vector3D = new ImmutableVector3D(16, 32, 16);
+    
+    const shiftY: number = 8;
+    const shiftZ: number = 4;
+    const xBlock: number = 0b1111;
+    const zBlock: number = 0b1111;
 
     /**
      * Returns the total number of cells in a chunk.
      */
-    static get cells() {
-        return this.dimensions.x * this.dimensions.y * this.dimensions.z;
-    }
+    export const cells = dimensions.x * dimensions.y * dimensions.z;
 
     /**
      * Computes the chunk data index for a given
@@ -38,9 +41,9 @@ export abstract class ChunkDataReferencer {
      * 
      * The method is the opposite of `position()`.
      */
-    static index(x: number, y: number, z: number): number;
-    static index(x: Vector3D): number;
-    static index(x: number | Vector3D, y?: number, z?: number): number {
+    export function index(x: number, y: number, z: number): number;
+    export function index(x: Vector3D): number;
+    export function index(x: number | Vector3D, y?: number, z?: number): number {
         if (x instanceof Vector3D) {
             y = x.y;
             z = x.z;
@@ -51,7 +54,7 @@ export abstract class ChunkDataReferencer {
 
         if (x < 0 || x >= this.dimensions.x || y < 0 || y >= this.dimensions.y || z < 0 || z >= this.dimensions.z) throw new Error(`Coordinates are out of bounds`);
 
-        return x + y * this.dimensions.x + z * this.dimensions.x * this.dimensions.y;
+        return x + (z << this.shiftZ) + (y << this.shiftY);
     }
 
     /**
@@ -60,8 +63,8 @@ export abstract class ChunkDataReferencer {
      * `z()` methods to get the complete position
      * without creating a vector.
      */
-    static x(index: number): number {
-        return index % this.dimensions.x;
+    export function x(index: number): number {
+        return index & xBlock;
     }
 
     /**
@@ -70,8 +73,8 @@ export abstract class ChunkDataReferencer {
      * and `z()` methods to get the complete position
      * without creating a vector.
      */
-    static y(index: number): number {
-        return Math.floor(index / this.dimensions.x) % this.dimensions.y;
+    export function y(index: number): number {
+        return index >> shiftY;
     }
 
     /**
@@ -80,8 +83,8 @@ export abstract class ChunkDataReferencer {
      * `y()` methods to get the complete position
      * without creating a vector.
      */
-    static z(index: number): number {
-        return Math.floor(index / (this.dimensions.x * this.dimensions.y));
+    export function z(index: number): number {
+        return index >> shiftZ & zBlock;
     }
 
     /**
@@ -92,7 +95,9 @@ export abstract class ChunkDataReferencer {
      * 
      * The method is the opposite of `index()`.
      */
-    static position(index: number): Vector3D {
+    export function position(index: number): Vector3D {
         return new MutableVector3D(this.x(index), this.y(index), this.z(index));
     }
 }
+
+window['cdr'] = ChunkDataReferencer;

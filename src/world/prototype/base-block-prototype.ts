@@ -1,27 +1,10 @@
-import { Game } from "../../game/game.js";
-import { Registries } from "../../game/registries.js";
+import { Registries } from "../../game/registry/registries.js";
 import { BlockPosition } from "./block-position.js";
 import { BlockPrototype } from "./block-prototype.js";
 
-export class BaseBlockPrototype extends BlockPrototype {
-    private blockId: number;
-    private blockName: string;
-
-    bindBlockReferences(blockId: number, blockName: string): void {
-        this.blockId = blockId;
-        this.blockName = blockName;
-    }
-
-    getBlockId(): number {
-        return this.blockId;
-    }
-
-    getBlockName(): string {
-        return this.blockName;
-    }
-
+export abstract class BaseBlockPrototype extends BlockPrototype {
     instantiate(position: BlockPosition): void {
-        position.getChunkData().getField('blockId').set(position, this.blockId);
+        position.getChunkData().getField('blockId').set(position, this.getRegisteredId());
     }
 
     whenDestroyed(position: BlockPosition): void {
@@ -34,11 +17,19 @@ export class BaseBlockPrototype extends BlockPrototype {
         position.getChunkData().setBlock(position, empty);
     }
 
-    whenUsed(position: BlockPosition): void {}
-    whenPlaced(position: BlockPosition): void {}
-    whenTicked(position: BlockPosition): void {}
+    whenUsed(position: BlockPosition): void {
+    }
+
+    whenPlaced(position: BlockPosition): void {
+    }
+
+    whenTicked(position: BlockPosition): void {
+    }
 
     isRendered() {
         return true;
+    }
+
+    async setup(): Promise<void> {
     }
 }

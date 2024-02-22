@@ -3,7 +3,7 @@ import { Vector2D } from "../utils/vector2d/vector2d.js";
 import { ChunkDataReferencer } from "./chunk-data/chunk-data-referencer.js";
 import { ChunkInterface } from "./chunk-interface.js";
 import { Chunk } from "./chunk.js";
-import { Entity } from "./entity.js";
+import { Entity } from "./entity/entity.js";
 import { PlaceholderChunk } from "./placeholder-chunk.js";
 import { WorldLoader } from "./world-loader.js";
 
@@ -45,38 +45,36 @@ export class World {
     }
 
     addEntity(entity: Entity) {
-        this.entityIdMapping.set(entity.id, entity);
+        this.entityIdMapping.set(entity.getUniqueId(), entity);
 
-        const chunk = this.getChunk(
-            Math.floor(entity.position.x / ChunkDataReferencer.dimensions.x),
-            Math.floor(entity.position.z / ChunkDataReferencer.dimensions.z)
-        );
+        const entityPosition = entity.getPosition();
 
-        if (!chunk) {
-            throw new Error("Cannot add entity to world: Chunk does not exist");
-        }
+        const chunkX = Math.floor(entityPosition.x / ChunkDataReferencer.dimensions.x);
+        const chunkZ = Math.floor(entityPosition.z / ChunkDataReferencer.dimensions.z);
 
-        entity._joinWorld(this);
+        const chunk = this.getChunk(chunkX, chunkZ) || this.loadChunk(chunkX, chunkZ);
+
+        entity.setWorld(this);
 
         if (!chunk.isPlaceholder()) {
             chunk.getChunkData().addEntity(entity);
-            entity._updateCurrentChunk(null);
+            entity.setParentChunk(null);
         } else {
-            entity._updateCurrentChunk(chunk as ChunkInterface.NonPlaceholder);
+            entity.setParentChunk(chunk as ChunkInterface.NonPlaceholder);
         }
 
         return entity;
     }
 
     removeEntity(entity: Entity) {
-        entity._leaveWorld();
+        entity.setWorld(null);
 
-        this.entityIdMapping.delete(entity.id);
+        this.entityIdMapping.delete(entity.getUniqueId());
     }
 
     _validateDisconnectedEntities() {
         for (const entity of this.entityIdMapping.values()) {
-            if (!entity.chunk) {
+            if (!entity.getParentChunk()) {
                 console.warn("Entity is not in a chunk\n", entity);
             }
         }
@@ -84,7 +82,7 @@ export class World {
 
     tick() {
         for (const entity of this.entityIdMapping.values()) {
-            entity.tick();
+            entity.tickEntity();
         }
 
         for (const [ _id, chunk ] of this.chunks) {
@@ -121,6 +119,8 @@ export class World {
 
         this.chunks.set(position.x + '.' + position.y, placeholder);
 
+        placeholder.bindWorld(this, position);
+
         this.loader.loadChunk(position).then(chunkData => {
             const chunk = new Chunk();
 
@@ -130,14 +130,17 @@ export class World {
             this.chunks.set(position.x + '.' + position.y, chunk);
 
             for (const entity of this.entityIdMapping.values()) {
-                if (!entity.chunk) continue;
+                const parentChunk = entity.getParentChunk();
 
-                if (entity.chunk.getPosition().equals(position)) {
-                    entity._updateCurrentChunk(chunk);
+                if (!parentChunk) continue;
+
+                if (parentChunk.getPosition().equals(position)) {
+                    entity.setParentChunk(chunk);
+                    chunk.getChunkData().addEntity(entity);
                 }
             }
         });
 
-        return new PlaceholderChunk();
+        return placeholder;
     }
 }
