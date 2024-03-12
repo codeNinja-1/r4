@@ -1,42 +1,46 @@
-import { Registries } from "../../../../game/registry/registries.js";
 import { World } from "../../../../world/world.js";
-import { WorldRenderer } from "../../world-renderer.js";
+import { Renderer } from "../../../renderer.js";
+import { Color } from "../../../utils/color.js";
 import { Perspective } from "../../pespective/perspective.js";
 import { Projector } from "../../pespective/projector.js";
-import { Renderer } from "../../../renderer.js";
-import { MeshAssembler } from "../../terrain/mesh-assembler.js";
+import { WorldRenderer } from "../../world-renderer.js";
+import { BindGroupManager } from "./bindings/bind-group-manager.js";
+import { BufferBindGroupEntry } from "./bindings/buffer-bind-group-entry.js";
+import { Camera } from "./camera.js";
+import { GraphicsDevice } from "./graphics-device.js";
+import { ClearRenderPass } from "./pass/clear-render-pass.js";
+import { RenderPass } from "./pass/render-pass.js";
+import { TerrainRenderPass } from "./pass/terrain-render-pass.js";
 import { WebGPUWorldMirror } from "./webgpu-world-mirror.js";
 
 export class WebGPURenderer implements WorldRenderer {
-    private canvas: HTMLCanvasElement;
-    private context: GPUCanvasContext;
-    private device: GPUDevice;
+    private device: GraphicsDevice;
     private world: World;
     private renderedWorld: WebGPUWorldMirror;
-    private pipeline: GPURenderPipeline;
+    private passes: RenderPass[];
+    private bindGroupManager: BindGroupManager;
 
+    private camera: Camera;
     private perspective: Perspective;
     private projector: Projector = new Projector(75, 1, 0.1, 1000);
 
     constructor(private renderer: Renderer) {
-        this.canvas = document.createElement('canvas');
         this.renderedWorld = new WebGPUWorldMirror(this);
-    }
+        this.device = new GraphicsDevice(document.createElement('canvas'), this);
+        this.bindGroupManager = new BindGroupManager();
 
-    getGPUDevice(): GPUDevice {
-        return this.device;
-    }
+        const terrainRenderPass = new TerrainRenderPass(this.renderedWorld);
 
-    getGPUContext(): GPUCanvasContext {
-        return this.context;
-    }
+        terrainRenderPass.setBindGroupManager(this.bindGroupManager);
 
-    getGPURenderPipeline(): GPURenderPipeline {
-        return this.pipeline;
+        this.passes = [
+            new ClearRenderPass(new Color(0, 0.1, 0.2, 1)),
+            terrainRenderPass
+        ];
     }
 
     getCanvas(): HTMLCanvasElement {
-        return this.canvas;
+        return this.device.getCanvas();
     }
 
     getRenderer(): Renderer {
@@ -54,108 +58,46 @@ export class WebGPURenderer implements WorldRenderer {
     }
 
     async setupWorldRenderer(): Promise<void> {
-        console.log("Initializing WebGPU");
+        await this.device.setup();
 
-        if (!navigator.gpu) {
-            throw new Error('WebGPU is not supported');
+        this.camera = new Camera();
+        await this.camera.setup(this.device);
+        this.bindGroupManager.addBindGroup(this.camera.getCameraBindGroup());
+
+        await this.renderedWorld.setup(this.device);
+
+        for (const pass of this.passes) {
+            await pass.setupBindings(this.device);
         }
 
-        const adapter = await navigator.gpu.requestAdapter();
-        if (!adapter) {
-            throw new Error('No useable adapter found');
+        await this.bindGroupManager.setup(this.device);
+
+        for (const pass of this.passes) {
+            await pass.setup(this.device);
         }
-
-        this.device = await adapter.requestDevice();
-
-        this.canvas = document.createElement('canvas');
-        
-        this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
-
-        const format = navigator.gpu.getPreferredCanvasFormat();
-
-        this.context.configure({
-            device: this.device,
-            format: format
-        });
-
-        console.log("Building pipeline");
-
-        const vertexBuffers: GPUVertexBufferLayout[] = [
-            {
-                attributes: [
-                    {
-                        shaderLocation: 0,
-                        offset: 0,
-                        format: "float32"
-                    },
-                    {
-                        shaderLocation: 1,
-                        offset: 0,
-                        format: "uint32"
-                    }
-                ],
-                arrayStride: 4,
-                stepMode: "vertex",
-            },
-        ];
-
-        let shaderModule;
-
-        const pipelineDescriptor = {
-            vertex: {
-                module: shaderModule,
-                entryPoint: "vertex_main",
-                buffers: vertexBuffers
-            },
-            fragment: {
-                module: shaderModule,
-                entryPoint: "fragment_main",
-                targets: [ { format } ]
-            },
-            primitive: {
-                topology: "triangle-list"
-            },
-            layout: "auto"
-        };
-
-        this.renderedWorld.setup();
     }
 
     render(): void {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        this.projector.setAspectRatio(this.canvas.width / this.canvas.height);
+        const canvas = this.device.getCanvas();
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        this.projector.setAspectRatio(canvas.width / canvas.height);
 
         this.perspective.updatePerspective();
         this.renderedWorld.updateRenderedWorld();
 
-        const commandEncoder = this.createCommandEncoder();
-        const renderPassEncoder = this.createRenderPassEncoder(commandEncoder);
+        const gpuDevice = this.device.getDevice();
 
-        this.renderedWorld.renderWorld(renderPassEncoder);
+        const commandEncoder = gpuDevice.createCommandEncoder({
+            label: "Renderer Command Encoder"
+        });
+        
+        for (const renderPass of this.passes) {
+            renderPass.render(commandEncoder);
+        }
 
-        renderPassEncoder.end();
-
-        this.device.queue.submit([ commandEncoder.finish() ]);
-    }
-
-    private createCommandEncoder(): GPUCommandEncoder {
-        return this.device.createCommandEncoder();
-    }
-
-    private createRenderPassEncoder(commandEncoder: GPUCommandEncoder): GPURenderPassEncoder {
-        const renderPassDescriptor: GPURenderPassDescriptor = {
-            colorAttachments: [
-                {
-                    clearValue: { r: 0.0, g: 0.5, b: 1.0, a: 1.0 },
-                    loadOp: "clear",
-                    storeOp: "store",
-                    view: this.context.getCurrentTexture().createView()
-                }
-            ]
-        };
-
-        return commandEncoder.beginRenderPass(renderPassDescriptor);
+        this.device.getDevice().queue.submit([ commandEncoder.finish() ]);
     }
 
     getPerspective(): Perspective {
@@ -172,6 +114,10 @@ export class WebGPURenderer implements WorldRenderer {
 
     setProjector(projector: Projector): void {
         this.projector = projector;
+    }
+
+    getCamera(): Camera {
+        return this.camera;
     }
 
     static async isSupported() {

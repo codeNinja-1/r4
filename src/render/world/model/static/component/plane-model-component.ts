@@ -81,7 +81,7 @@ export class PlaneModelComponent extends PositionedModelComponent {
     private static getBaseGeometry() {
         const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
 
-        for (let i = 0; i < PlaneModelComponent.baseTextureMapping.length * 2; i++) {
+        for (let i = 0; i < PlaneModelComponent.baseTextureMapping.length / 2; i++) {
             data[i] = PlaneModelComponent.baseTextureMapping[i * 2] - 0.5;
             data[i + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] - 0.5;
         }

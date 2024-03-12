@@ -2,7 +2,7 @@ import { BaseEntityPrototype } from "../../../world/prototype/base-entity-protot
 import { PlayerEntity } from "./player-entity.js";
 
 export class PlayerPrototype extends BaseEntityPrototype<PlayerEntity> {
-    instantiate(): PlayerEntity {
+    createEntity(): PlayerEntity {
         return new PlayerEntity();
     }
 }

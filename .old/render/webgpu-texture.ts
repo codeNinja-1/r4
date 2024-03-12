@@ -1,4 +1,4 @@
-import { Texture } from "../../../utils/texture.js";
+import { Texture } from "../../src/render/utils/texture.js";
 import { WebGPURenderer } from "./webgpu-renderer.js";
 
 export class WebGPUTexture {

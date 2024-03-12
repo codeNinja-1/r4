@@ -80,9 +80,9 @@ export class World {
         }
     }
 
-    tick() {
+    tick(delta: number) {
         for (const entity of this.entityIdMapping.values()) {
-            entity.tickEntity();
+            entity.tickEntity(delta);
         }
 
         for (const [ _id, chunk ] of this.chunks) {

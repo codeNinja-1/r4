@@ -50,7 +50,7 @@ export class Texture extends IndexedRegistryItem {
     }
 
     static load(name: string): Promise<Texture> {
-        const url = name.replace(/\./g, '/') + '.png';
+        const url = '/assets/textures/' + name.replace(/\./g, '/') + '.png';
         
         return new Promise((resolve, reject) => {
             const image = new Image();

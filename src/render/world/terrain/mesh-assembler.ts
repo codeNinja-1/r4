@@ -140,6 +140,18 @@ export class MeshAssembler {
             textureIndex++;
         }
 
+        canvas.convertToBlob().then(blob => {
+            const url = URL.createObjectURL(blob);
+
+            const img = new Image();
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+            };
+
+            img.src = url;
+            document.body.appendChild(img);
+        });
+
         const texture = Texture.fromImageData(context.getImageData(0, 0, size.x, size.y));
 
         return { texturePositions, texture };

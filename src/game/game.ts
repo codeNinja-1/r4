@@ -20,9 +20,12 @@ export abstract class Game {
         await Game.init.run();
 
         Registries.fields.register('blockId', new ChunkDataNumberAllocation('u16'));
-        Registries.blocks.allocateBlockIds();
 
         await loadGameContent();
+
+        Registries.blocks.allocate();
+        Registries.textures.allocate();
+        Registries.blocks.allocate();
     }
     
     abstract getRuntimeType(): GameRuntimeType;

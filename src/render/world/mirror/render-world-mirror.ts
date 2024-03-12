@@ -58,4 +58,5 @@ export abstract class RenderWorldMirror<M extends RenderChunkMirror> {
     
     abstract getWorld(): World;
     abstract getPerspective(): Perspective;
+    abstract getVisibleChunks(): Iterable<M>;
 }

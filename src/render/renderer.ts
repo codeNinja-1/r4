@@ -1,6 +1,6 @@
 import { World } from "../world/world.js";
-import { WorldRenderer } from "./world/world-renderer.js";
 import { WebGPURenderer } from "./world/implementation/webgpu/webgpu-renderer.js";
+import { WorldRenderer } from "./world/world-renderer.js";
 
 export class Renderer {
     private worldRenderer: WorldRenderer | null;
@@ -31,8 +31,8 @@ export class Renderer {
             throw new Error("No supported world renderer found");
         }
 
-        this.worldRenderer.setupWorldRenderer();
         this.worldRenderer.setWorld(this.world);
+        await this.worldRenderer.setupWorldRenderer();
     }
 
     render(): void {

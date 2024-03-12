@@ -5,7 +5,7 @@ import { ModelComponent } from "./model-component.js";
 import { StaticModel } from "./static-model.js";
 
 export class BlockModel extends IndexedRegistryItem implements StaticModel {
-    components: Set<ModelComponent>;
+    components: Set<ModelComponent> = new Set();
 
     getVertexPositions(): Float32Array {
         const components = Array.from(this.components);

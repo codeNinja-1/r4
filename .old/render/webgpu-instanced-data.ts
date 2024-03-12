@@ -1,21 +1,32 @@
-import { ChunkData } from "../../../../world/chunk-data/chunk-data.js";
-import { InstancedData } from "../../instancing/instanced-data.js";
-import { AssembledMesh } from "../../terrain/assembled-mesh.js";
+import { ChunkDataReferencer } from "../../src/world/chunk-data/chunk-data-referencer.js";
+import { ChunkData } from "../../src/world/chunk-data/chunk-data.js";
+import { InstancedData } from "../../src/render/world/instancing/instanced-data.js";
+import { AssembledMesh } from "../../src/render/world/terrain/assembled-mesh.js";
 
 export class WebGPUInstancedData extends InstancedData {
-    protected indirectCalls: ArrayBuffer;
+    private indirectCalls: ArrayBuffer;
     
-    constructor(protected assembledMesh: AssembledMesh, chunkData: ChunkData) {
+    constructor(private assembledMesh: AssembledMesh, chunkData: ChunkData) {
         super(chunkData);
+
+        this.indirectCalls = new ArrayBuffer(ChunkDataReferencer.cells * 16);
     }
 
     update() {
         super.update();
 
-        this.indirectCalls = new ArrayBuffer(this.segments.length * 16);
         const indirectCalls = new Uint32Array(this.indirectCalls);
 
-        for (let i = 0; i < this.segments.length; i++) {
+        for (let i = 0; i < this.indirectCalls.byteLength / 16; i++) {
+            if (i >= this.segments.length) {
+                indirectCalls[i * 4] = 0;
+                indirectCalls[i * 4 + 1] = 0;
+                indirectCalls[i * 4 + 2] = 0;
+                indirectCalls[i * 4 + 3] = 0;
+
+                continue;
+            }
+
             const segment = this.segments[i];
             const model = segment.getModel();
 

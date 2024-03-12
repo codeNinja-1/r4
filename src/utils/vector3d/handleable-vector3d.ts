@@ -40,6 +40,8 @@ export class HandleableVector3D extends MutableVector3D {
     }
 
     static from(vector: Vector2D, format: string) {
-        return new HandleableVector3D(...Vector3D._from(vector, format));
+        const values = [...Vector3D._from(vector, format)];
+
+        return new HandleableVector3D(values[0], values[1], values[2]);
     }
 }

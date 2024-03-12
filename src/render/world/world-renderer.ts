@@ -1,9 +1,7 @@
-import { Vector2D } from "../../utils/vector2d/vector2d.js";
 import { World } from "../../world/world.js";
 import { Perspective } from "./pespective/perspective.js";
 import { Projector } from "./pespective/projector.js";
 import { Renderer } from "../renderer.js";
-import { RenderChunkMirror } from "./mirror/render-chunk-mirror.js";
 
 export interface WorldRenderer {
     getRenderer(): Renderer;

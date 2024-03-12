@@ -1,3 +1,5 @@
+import { PhysicalEntityProperties } from "../../physics/entity/physical-entity-properties.js";
+import { PhysicalEntityState } from "../../physics/entity/physical-entity-state.js";
 import { Rotation } from "../../utils/rotation/rotation.js";
 import { HandleableVector3D } from "../../utils/vector3d/handleable-vector3d.js";
 import { Vector3D } from "../../utils/vector3d/vector3d.js";
@@ -91,16 +93,23 @@ export abstract class BaseEntity implements Entity {
         return this.chunk;
     }
 
-    tickEntity(): void {
-        throw new Error("Method not implemented.");
+    tickEntity(delta: number): void {
     }
 
     getPosition(): Vector3D {
         return this.position;
     }
 
-    setPosition(position: Vector3D): void {
-        this.position.set(position);
+    setPosition(x: number, y: number, z: number): void;
+    setPosition(position: Vector3D): void;
+    setPosition(x: Vector3D | number, y?: number, z?: number): void {
+        if (x instanceof Vector3D) {
+            this.position.set(x.x, x.y, x.z);
+        } else if (typeof y == 'number' && typeof z == 'number') {
+            this.position.set(x, y, z);
+        } else {
+            throw new Error("Invalid arguments to BaseEntity.setPosition()");
+        }
     }
 
     getRotation(): Rotation {
@@ -117,6 +126,25 @@ export abstract class BaseEntity implements Entity {
 
     abstract getPrototype(): EntityPrototype<BaseEntity>;
     abstract canLoadChunks(): boolean;
+
+    getEntityModel() {
+        return null;
+    }
+
+    getPhysicalEntity() {
+        return null;
+    }
+
+    whenJoinWorld() {
+    }
+
+    getPhysicalState(): PhysicalEntityState | null {
+        return null;
+    }
+
+    getPhysicalProperties(): PhysicalEntityProperties | null {
+        return null;
+    }
 
     static generateUniqueId(): string {
         return crypto.randomUUID();

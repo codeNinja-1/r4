@@ -4,8 +4,7 @@
     "main": "dist/main.js",
     "scripts": {
         "test": "npx mocha dist/test.js --enable-source-maps",
-        "build": "rollup --config",
-        "watch": "rollup --config --watch",
+        "build": "rollup --config --watch",
         "start": "node dist/index.js --enable-source-maps",
         "serve": "npx serve ."
     },

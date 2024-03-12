@@ -2,7 +2,7 @@ import { IndexedRegistryItem } from "./indexed-registry-item.js";
 import { Registry } from "./registry.js";
 
 export class IndexedRegistry<T extends IndexedRegistryItem> extends Registry<T> {
-    private idsToItems: Map<number, T>;
+    private idsToItems: Map<number, T> = new Map();
 
     get(id: string | number) {
         if (typeof id == 'string') return super.get(id);
@@ -10,7 +10,7 @@ export class IndexedRegistry<T extends IndexedRegistryItem> extends Registry<T> 
         return this.idsToItems.get(id);
     }
 
-    async allocateBlockIds() {
+    async allocate() {
         this.idsToItems = new Map();
 
         let id = 0;

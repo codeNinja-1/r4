@@ -5,7 +5,7 @@ import { Texture } from "../../../../utils/texture.js";
 import { GroupModelComponent } from "./group-model-component.js";
 import { PlaneModelComponent } from "./plane-model-component.js";
 
-export class CubeModelComponent extends GroupModelComponent {
+export class BoxModelComponent extends GroupModelComponent {
     constructor(dimensions: Vector3D, textures: Texture[]) {
         super();
 

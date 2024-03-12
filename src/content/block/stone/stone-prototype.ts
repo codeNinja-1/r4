@@ -1,6 +1,6 @@
 import { Texture } from "../../../render/utils/texture.js";
 import { BlockModel } from "../../../render/world/model/static/block-model.js";
-import { CubeModelComponent } from "../../../render/world/model/static/component/cube-model-component.js";
+import { BoxModelComponent } from "../../../render/world/model/static/component/box-model-component.js";
 import { ImmutableVector3D } from "../../../utils/vector3d/immutable-vector3d.js";
 import { BaseBlockPrototype } from "../../../world/prototype/base-block-prototype.js";
 import { BlockPosition } from "../../../world/prototype/block-position.js";
@@ -11,22 +11,26 @@ export class StonePrototype extends BaseBlockPrototype {
     }
 
     getBlockModel(position: BlockPosition): BlockModel | null {
-        return this.model;
+        return StonePrototype.model;
     }
 
-    private model: BlockModel;
-    private texture: Texture;
+    private static model: BlockModel;
+    private static texture: Texture;
 
-    async setup() {
+    static async setup() {
         this.texture = await Texture.load("blocks.stone");
 
         this.model = new BlockModel();
 
-        const box = new CubeModelComponent(
+        const box = new BoxModelComponent(
             new ImmutableVector3D(1, 1, 1),
             new Array(6).fill(this.texture)
         );
 
         this.model.add(box);
+    }
+
+    static getBlockModel() {
+        return StonePrototype.model;
     }
 }

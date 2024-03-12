@@ -28,13 +28,13 @@ class Registry {
 }
 
 class IndexedRegistry extends Registry {
-    idsToItems;
+    idsToItems = new Map();
     get(id) {
         if (typeof id == 'string')
             return super.get(id);
         return this.idsToItems.get(id);
     }
-    async allocateBlockIds() {
+    async allocate() {
         this.idsToItems = new Map();
         let id = 0;
         for (const [name, item] of this.entries()) {
@@ -105,7 +105,7 @@ class Texture extends IndexedRegistryItem {
         return new Texture(data, width, height);
     }
     static load(name) {
-        const url = name.replace(/\./g, '/') + '.png';
+        const url = '/assets/textures/' + name.replace(/\./g, '/') + '.png';
         return new Promise((resolve, reject) => {
             const image = new Image();
             image.onload = () => {
@@ -333,8 +333,13 @@ class Vector3D {
 }
 
 class ImmutableVector3D extends Vector3D {
-    constructor(x = 0, y = 0, z = 0) {
-        super(x, y, z);
+    constructor(x, y, z) {
+        if (x instanceof Vector3D)
+            super(x.x, x.y, x.z);
+        else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number')
+            super(x, y, z);
+        else
+            super(0, 0, 0);
     }
     _set(x, y, z) {
         return new ImmutableVector3D(x, y, z);
@@ -343,12 +348,13 @@ class ImmutableVector3D extends Vector3D {
         throw new Error("Cannot set immutable vector");
     }
     static from(vector, format) {
-        return new ImmutableVector3D(...Vector3D._from(vector, format));
+        const values = [...Vector3D._from(vector, format)];
+        return new ImmutableVector3D(values[0], values[1], values[2]);
     }
 }
 
 class BlockModel extends IndexedRegistryItem {
-    components;
+    components = new Set();
     getVertexPositions() {
         const components = Array.from(this.components);
         const positions = components.map(component => component.getVertexPositions(new ImmutableVector3D()));
@@ -380,8 +386,13 @@ class BlockModel extends IndexedRegistryItem {
 }
 
 class MutableVector3D extends Vector3D {
-    constructor(x = 0, y = 0, z = 0) {
-        super(x, y, z);
+    constructor(x, y, z) {
+        if (x instanceof Vector3D)
+            super(x.x, x.y, x.z);
+        else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number')
+            super(x, y, z);
+        else
+            super(0, 0, 0);
     }
     _set(x, y, z) {
         this.x = x;
@@ -390,7 +401,8 @@ class MutableVector3D extends Vector3D {
         return this;
     }
     static from(vector, format) {
-        return new MutableVector3D(...Vector3D._from(vector, format));
+        const values = [...Vector3D._from(vector, format)];
+        return new MutableVector3D(values[0], values[1], values[2]);
     }
 }
 
@@ -856,7 +868,7 @@ class PlaneModelComponent extends PositionedModelComponent {
     static baseGeometry = PlaneModelComponent.getBaseGeometry();
     static getBaseGeometry() {
         const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
-        for (let i = 0; i < PlaneModelComponent.baseTextureMapping.length * 2; i++) {
+        for (let i = 0; i < PlaneModelComponent.baseTextureMapping.length / 2; i++) {
             data[i] = PlaneModelComponent.baseTextureMapping[i * 2] - 0.5;
             data[i + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] - 0.5;
         }
@@ -864,7 +876,7 @@ class PlaneModelComponent extends PositionedModelComponent {
     }
 }
 
-class CubeModelComponent extends GroupModelComponent {
+class BoxModelComponent extends GroupModelComponent {
     constructor(dimensions, textures) {
         super();
         const north = new PlaneModelComponent(textures[0], new ImmutableVector2D(dimensions.x, dimensions.y), Orientation.North);
@@ -909,15 +921,18 @@ class StonePrototype extends BaseBlockPrototype {
         console.log("Stone placed at " + position.toString());
     }
     getBlockModel(position) {
-        return this.model;
+        return StonePrototype.model;
     }
-    model;
-    texture;
-    async setup() {
+    static model;
+    static texture;
+    static async setup() {
         this.texture = await Texture.load("blocks.stone");
         this.model = new BlockModel();
-        const box = new CubeModelComponent(new ImmutableVector3D(1, 1, 1), new Array(6).fill(this.texture));
+        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), new Array(6).fill(this.texture));
         this.model.add(box);
+    }
+    static getBlockModel() {
+        return StonePrototype.model;
     }
 }
 
@@ -958,7 +973,8 @@ class HandleableVector3D extends MutableVector3D {
         throw new Error("Cannot clone handleable vector. Instead use immutable() or mutable() to output a non-handlable vector.");
     }
     static from(vector, format) {
-        return new HandleableVector3D(...Vector3D._from(vector, format));
+        const values = [...Vector3D._from(vector, format)];
+        return new HandleableVector3D(values[0], values[1], values[2]);
     }
 }
 
@@ -1117,14 +1133,21 @@ class BaseEntity {
     getParentChunk() {
         return this.chunk;
     }
-    tickEntity() {
-        throw new Error("Method not implemented.");
+    tickEntity(delta) {
     }
     getPosition() {
         return this.position;
     }
-    setPosition(position) {
-        this.position.set(position);
+    setPosition(x, y, z) {
+        if (x instanceof Vector3D) {
+            this.position.set(x.x, x.y, x.z);
+        }
+        else if (typeof y == 'number' && typeof z == 'number') {
+            this.position.set(x, y, z);
+        }
+        else {
+            throw new Error("Invalid arguments to BaseEntity.setPosition()");
+        }
     }
     getRotation() {
         return this.rotation;
@@ -1134,6 +1157,20 @@ class BaseEntity {
     }
     getUniqueId() {
         return this.id;
+    }
+    getEntityModel() {
+        return null;
+    }
+    getPhysicalEntity() {
+        return null;
+    }
+    whenJoinWorld() {
+    }
+    getPhysicalState() {
+        return null;
+    }
+    getPhysicalProperties() {
+        return null;
     }
     static generateUniqueId() {
         return crypto.randomUUID();
@@ -1150,14 +1187,16 @@ class PlayerEntity extends BaseEntity {
 }
 
 class PlayerPrototype extends BaseEntityPrototype {
-    instantiate() {
+    createEntity() {
         return new PlayerEntity();
     }
 }
 
 async function loadGameContent() {
     Registries.entities.register('player', new PlayerPrototype());
+    await StonePrototype.setup();
     Registries.blocks.register('stone', new StonePrototype());
+    Registries.blockModels.register('stone', StonePrototype.getBlockModel());
 }
 
 /**
@@ -1434,9 +1473,9 @@ class World {
             }
         }
     }
-    tick() {
+    tick(delta) {
         for (const entity of this.entityIdMapping.values()) {
-            entity.tickEntity();
+            entity.tickEntity(delta);
         }
         for (const [_id, chunk] of this.chunks) {
             chunk.tickChunk();
@@ -1836,8 +1875,10 @@ class Game {
     async start() {
         await Game.init.run();
         Registries.fields.register('blockId', new ChunkDataNumberAllocation('u16'));
-        Registries.blocks.allocateBlockIds();
         await loadGameContent();
+        Registries.blocks.allocate();
+        Registries.textures.allocate();
+        Registries.blocks.allocate();
     }
     isGameClient() {
         return this.getRuntimeType() === GameRuntimeType.Singleplayer || this.getRuntimeType() === GameRuntimeType.MultiplayerClient;
@@ -1859,6 +1900,65 @@ class Game {
     }
     getClock() {
         return this.clock;
+    }
+}
+
+class Color {
+    red;
+    green;
+    blue;
+    alpha;
+    constructor(red, green, blue, alpha) {
+        this.red = red;
+        this.green = green;
+        this.blue = blue;
+        this.alpha = alpha;
+    }
+    static fromHex(hex) {
+        const red = parseInt(hex.substring(1, 3), 16);
+        const green = parseInt(hex.substring(3, 5), 16);
+        const blue = parseInt(hex.substring(5, 7), 16);
+        return new Color(red / 255, green / 255, blue / 255, 1);
+    }
+    static fromRGB(red, green, blue) {
+        return new Color(red / 255, green / 255, blue / 255, 1);
+    }
+    static fromRGBA(red, green, blue, alpha) {
+        return new Color(red / 255, green / 255, blue / 255, alpha);
+    }
+    static toHex(color) {
+        const red = Math.round(color.red * 255).toString(16).padStart(2, "0");
+        const green = Math.round(color.green * 255).toString(16).padStart(2, "0");
+        const blue = Math.round(color.blue * 255).toString(16).padStart(2, "0");
+        return `#${red}${green}${blue}`;
+    }
+    static toRGB(color) {
+        const red = Math.round(color.red * 255);
+        const green = Math.round(color.green * 255);
+        const blue = Math.round(color.blue * 255);
+        return `rgb(${red}, ${green}, ${blue})`;
+    }
+    static toRGBA(color) {
+        const red = Math.round(color.red * 255);
+        const green = Math.round(color.green * 255);
+        const blue = Math.round(color.blue * 255);
+        return `rgba(${red}, ${green}, ${blue}, ${color.alpha})`;
+    }
+    static toGPUColor(color) {
+        return {
+            r: color.red,
+            g: color.green,
+            b: color.blue,
+            a: color.alpha
+        };
+    }
+    static blend(color1, color2, factor) {
+        const inverseFactor = 1 - factor;
+        const red = color1.red * factor + color2.red * inverseFactor;
+        const green = color1.green * factor + color2.green * inverseFactor;
+        const blue = color1.blue * factor + color2.blue * inverseFactor;
+        const alpha = color1.alpha * factor + color2.alpha * inverseFactor;
+        return new Color(red, green, blue, alpha);
     }
 }
 
@@ -2114,35 +2214,6 @@ class Matrix4 {
     }
 }
 
-class EntityPerspective {
-    entity;
-    matrix;
-    constructor(entity) {
-        this.entity = entity;
-    }
-    getChunkLocation() {
-        if (!this.entity.getParentChunk()) {
-            throw new Error("Cannot get chunk location of unbound entity");
-        }
-        return this.entity.getParentChunk().getPosition();
-    }
-    getTransformationMatrix() {
-        return this.matrix;
-    }
-    getRenderDistance() {
-        return 10;
-    }
-    updatePerspective() {
-        this.matrix = this.computeTransformationMatrix();
-    }
-    computeTransformationMatrix() {
-        let matrix = new Matrix4();
-        matrix.multiply(Matrix4.createTranslation(this.entity.getPosition()));
-        matrix.multiply(Matrix4.createRotation(this.entity.getRotation()));
-        return matrix;
-    }
-}
-
 class Projector {
     fieldOfView;
     aspect;
@@ -2191,6 +2262,475 @@ class Projector {
     }
     computeProjectionMatrix() {
         return Matrix4.createPerspective(this.fieldOfView, this.aspect, this.near, this.far);
+    }
+}
+
+class BindGroupManager {
+    bindGroups = new Set();
+    async setup(device) {
+        for (const bindGroup of this.bindGroups) {
+            await bindGroup.setup(device);
+        }
+        console.log("BindGroupManager setup");
+        console.log(this.bindGroups);
+    }
+    addBindGroup(bindGroup) {
+        this.bindGroups.add(bindGroup);
+    }
+}
+
+var Bindings;
+(function (Bindings) {
+    Bindings.CameraBindGroup = 0;
+    Bindings.CameraDataBinding = 0;
+    Bindings.BlockModelBindGroup = 1;
+    Bindings.BlockModelGeometryBinding = 0;
+    Bindings.BlockModelTextureMappingBinding = 1;
+    Bindings.BlockModelTextureBinding = 2;
+    Bindings.BlockModelTextureSamplerBinding = 3;
+})(Bindings || (Bindings = {}));
+
+class BindGroup {
+    index;
+    entries = new Set();
+    layout;
+    group;
+    constructor(index) {
+        this.index = index;
+    }
+    async setup(device) {
+        for (const entry of this.entries) {
+            await entry.setup(device);
+        }
+        const layoutEntries = [];
+        for (const entry of this.entries) {
+            layoutEntries.push(entry.getLayoutEntry());
+        }
+        this.layout = device.getDevice().createBindGroupLayout({
+            entries: layoutEntries
+        });
+        const bindGroupEntries = [];
+        for (const entry of this.entries) {
+            console.log(entry.getBindGroupEntry());
+            bindGroupEntries.push(entry.getBindGroupEntry());
+        }
+        this.group = device.getDevice().createBindGroup({
+            label: `Bind Group ${this.index}`,
+            layout: this.layout,
+            entries: bindGroupEntries
+        });
+    }
+    addEntry(binding, entry) {
+        this.entries.add(entry);
+        entry.setBinding(binding);
+    }
+    getBindGroupLayout() {
+        return this.layout;
+    }
+    getBindGroupIndex() {
+        return this.index;
+    }
+    getBindGroup() {
+        return this.group;
+    }
+}
+
+class BufferBindGroupEntry {
+    buffer;
+    visibility;
+    type;
+    binding;
+    constructor(buffer, visibility, type) {
+        this.buffer = buffer;
+        this.visibility = visibility;
+        this.type = type;
+    }
+    setBinding(index) {
+        this.binding = index;
+    }
+    async setup(device) {
+    }
+    getLayoutEntry() {
+        return {
+            binding: this.binding,
+            visibility: this.visibility,
+            buffer: {
+                type: this.type
+            }
+        };
+    }
+    getBindGroupEntry() {
+        return {
+            binding: this.binding,
+            resource: {
+                buffer: this.buffer
+            }
+        };
+    }
+}
+
+class Camera {
+    bindGroup;
+    bindGroupEntry;
+    buffer;
+    perspective;
+    async setup(device) {
+        this.buffer = device.getDevice().createBuffer({
+            size: 4 * 4 * 32 * 2,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+        this.bindGroup = new BindGroup(Bindings.CameraBindGroup);
+        this.bindGroupEntry = new BufferBindGroupEntry(this.buffer, GPUShaderStage.VERTEX, "uniform");
+        this.bindGroup.addEntry(Bindings.CameraDataBinding, this.bindGroupEntry);
+        await this.bindGroup.setup(device);
+    }
+    setPerspective(perspective) {
+        this.perspective = perspective;
+    }
+    getCameraBindGroup() {
+        return this.bindGroup;
+    }
+}
+
+class GraphicsDevice {
+    canvas;
+    renderer;
+    device;
+    adapter;
+    context;
+    constructor(canvas, renderer) {
+        this.canvas = canvas;
+        this.renderer = renderer;
+    }
+    async setup() {
+        console.log("Initializing WebGPU");
+        if (!navigator.gpu) {
+            throw new Error('WebGPU is not supported');
+        }
+        const adapter = await navigator.gpu.requestAdapter();
+        if (!adapter) {
+            throw new Error('No useable adapter found');
+        }
+        this.adapter = adapter;
+        this.device = await adapter.requestDevice();
+        this.context = this.canvas.getContext('webgpu');
+        this.context.configure({
+            device: this.device,
+            format: navigator.gpu.getPreferredCanvasFormat()
+        });
+    }
+    getDevice() {
+        return this.device;
+    }
+    getContext() {
+        return this.context;
+    }
+    getCanvas() {
+        return this.canvas;
+    }
+    getAdapter() {
+        return this.adapter;
+    }
+    getRenderer() {
+        return this.renderer;
+    }
+}
+
+class ClearRenderPass {
+    color;
+    device;
+    constructor(color) {
+        this.color = color;
+    }
+    async setup(device) {
+        this.device = device;
+    }
+    async setupBindings(device) {
+    }
+    render(commandEncoder) {
+        const renderPassDescriptor = {
+            colorAttachments: [
+                {
+                    clearValue: Color.toGPUColor(this.color),
+                    loadOp: "clear",
+                    storeOp: "store",
+                    view: this.device.getContext().getCurrentTexture().createView()
+                }
+            ]
+        };
+        const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
+        renderPass.end();
+    }
+}
+
+class TextureSampler {
+    sampler;
+    binding;
+    getLayoutEntry() {
+        return {
+            binding: this.binding,
+            visibility: GPUShaderStage.FRAGMENT,
+            sampler: {}
+        };
+    }
+    getBindGroupEntry() {
+        return {
+            binding: this.binding,
+            resource: this.sampler
+        };
+    }
+    setBinding(index) {
+        this.binding = index;
+    }
+    async setup(device) {
+        this.sampler = device.getDevice().createSampler({
+            magFilter: 'nearest',
+            minFilter: 'nearest',
+            mipmapFilter: 'nearest',
+            lodMinClamp: 0,
+            lodMaxClamp: 0
+        });
+    }
+}
+
+class WebGPUTexture {
+    source;
+    texture;
+    device;
+    binding;
+    constructor(source) {
+        this.source = source;
+    }
+    setBinding(index) {
+        this.binding = index;
+    }
+    getLayoutEntry() {
+        return {
+            binding: this.binding,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: {
+                sampleType: 'float',
+                viewDimension: '2d'
+            }
+        };
+    }
+    getBindGroupEntry() {
+        if (!this.texture) {
+            throw new Error('Texture not initialized');
+        }
+        return {
+            binding: this.binding,
+            resource: this.texture.createView()
+        };
+    }
+    getTexture() {
+        if (!this.texture) {
+            throw new Error('Texture not initialized');
+        }
+        return this.texture;
+    }
+    async setup(device) {
+        this.device = device;
+        this.texture = device.getDevice().createTexture({
+            size: [
+                this.source.getTextureWidth(),
+                this.source.getTextureHeight()
+            ],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING
+        });
+        device.getDevice().queue.writeTexture({ texture: this.texture }, this.source.toDataArray(), { bytesPerRow: this.source.getTextureWidth() * 4, rowsPerImage: this.source.getTextureHeight() }, [this.source.getTextureWidth(), this.source.getTextureHeight()]);
+    }
+}
+
+class ShaderModule {
+    label;
+    code;
+    shaderModule;
+    constructor(label, code) {
+        this.label = label;
+        this.code = code;
+    }
+    setup(graphicsDevice) {
+        this.shaderModule = graphicsDevice.getDevice().createShaderModule({
+            label: this.label,
+            code: this.code
+        });
+    }
+    getShaderModule() {
+        return this.shaderModule;
+    }
+    static async import(path, label = path) {
+        const response = await fetch(path);
+        const code = await response.text();
+        return new ShaderModule(label, code);
+    }
+}
+
+class PipelineBindGroupManager {
+    parent;
+    usedGroups = new Set();
+    constructor(parent) {
+        this.parent = parent;
+    }
+    useBindGroup(bindGroup) {
+        this.parent.addBindGroup(bindGroup);
+        this.usedGroups.add(bindGroup);
+    }
+    addBindGroupsToPipelineLayout(pipelineLayout) {
+        const bindGroupLayouts = [];
+        for (const bindGroup of this.usedGroups) {
+            bindGroupLayouts.push(bindGroup.getBindGroupLayout());
+        }
+        pipelineLayout.bindGroupLayouts = bindGroupLayouts;
+    }
+    setBindGroupsOnRenderPassEncoder(encoder) {
+        for (const bindGroup of this.usedGroups) {
+            encoder.setBindGroup(bindGroup.getBindGroupIndex(), bindGroup.getBindGroup());
+        }
+    }
+}
+
+class BaseRenderPass {
+    pipeline;
+    descriptor = {};
+    pipelineLayout;
+    bindGroupManager;
+    device;
+    setBindGroupManager(bindGroupManager) {
+        this.bindGroupManager = new PipelineBindGroupManager(bindGroupManager);
+    }
+    async setup(device) {
+        const gpuDevice = device.getDevice();
+        const layoutDescriptor = {};
+        this.bindGroupManager.addBindGroupsToPipelineLayout(layoutDescriptor);
+        this.pipelineLayout = gpuDevice.createPipelineLayout(layoutDescriptor);
+        this.descriptor.layout = this.pipelineLayout;
+        this.pipeline = gpuDevice.createRenderPipeline(this.descriptor);
+        this.device = device;
+    }
+    async setupBindings(device) {
+    }
+    addLabel(label) {
+        this.descriptor.label = label;
+    }
+    addVertexStage(module, entryPoint) {
+        this.descriptor.vertex = {
+            module: module.getShaderModule(),
+            entryPoint
+        };
+    }
+    addFragmentStage(module, entryPoint) {
+        this.descriptor.fragment = {
+            module: module.getShaderModule(),
+            entryPoint,
+            targets: [
+                { format: navigator.gpu.getPreferredCanvasFormat() }
+            ]
+        };
+    }
+    addPrimitiveTopology(topology, cullMode = "none") {
+        this.descriptor.primitive = {
+            topology,
+            cullMode
+        };
+    }
+    getBindGroupManager() {
+        return this.bindGroupManager;
+    }
+    getPipelineLayout() {
+        return this.pipelineLayout;
+    }
+    render(commandEncoder) {
+        const renderPass = commandEncoder.beginRenderPass({
+            colorAttachments: [
+                {
+                    view: this.device.getContext().getCurrentTexture().createView(),
+                    loadOp: "load",
+                    storeOp: "store"
+                }
+            ]
+        });
+        this.bindGroupManager.setBindGroupsOnRenderPassEncoder(renderPass);
+        renderPass.setPipeline(this.pipeline);
+        this.draw(renderPass, commandEncoder);
+        renderPass.end();
+    }
+    getGraphicsDevice() {
+        return this.device;
+    }
+}
+
+class TerrainRenderPass extends BaseRenderPass {
+    worldMirror;
+    indirectDrawBuffer;
+    constructor(worldMirror) {
+        super();
+        this.worldMirror = worldMirror;
+    }
+    async setupBindings(device) {
+        const gpuDevice = device.getDevice();
+        this.indirectDrawBuffer = gpuDevice.createBuffer({
+            label: "Terrain Indirect Draw Buffer",
+            usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.STORAGE,
+            size: ChunkDataReferencer.cells * 16
+        });
+        const shader = await ShaderModule.import("/assets/shaders/terrain.wgsl", "Terrain Shader");
+        shader.setup(device);
+        this.addPrimitiveTopology("triangle-list", "back");
+        this.addLabel("Terrain Render Pass");
+        this.addVertexStage(shader, "vertex_main");
+        this.addFragmentStage(shader, "fragment_main");
+        this.getBindGroupManager().useBindGroup(device.getRenderer().getCamera().getCameraBindGroup());
+        await this.setupBlockModelBindings(device);
+    }
+    async setupBlockModelBindings(device) {
+        const blockModelBindGroup = new BindGroup(Bindings.BlockModelBindGroup);
+        await this.setupGeometryBindings(blockModelBindGroup, device);
+        await this.setupTextureMappingBindings(blockModelBindGroup, device);
+        await this.setupTextureBindings(blockModelBindGroup, device);
+        await this.setupTextureSamplerBindings(blockModelBindGroup, device);
+        this.getBindGroupManager().useBindGroup(blockModelBindGroup);
+    }
+    async setupGeometryBindings(bindGroup, device) {
+        const gpuDevice = device.getDevice();
+        const geometryData = this.worldMirror.getTerrainMesh().getVertexPositions();
+        const geometryBuffer = gpuDevice.createBuffer({
+            label: "Terrain Geometry Buffer",
+            size: geometryData.byteLength,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        });
+        gpuDevice.queue.writeBuffer(geometryBuffer, 0, geometryData);
+        const geometryBindGroupEntry = new BufferBindGroupEntry(geometryBuffer, GPUShaderStage.VERTEX, "read-only-storage");
+        bindGroup.addEntry(Bindings.BlockModelGeometryBinding, geometryBindGroupEntry);
+    }
+    async setupTextureMappingBindings(bindGroup, device) {
+        const gpuDevice = device.getDevice();
+        const textureMappingData = this.worldMirror.getTerrainMesh().getTextureMappings();
+        const textureMappingBuffer = gpuDevice.createBuffer({
+            label: "Terrain Texture Mapping Buffer",
+            size: textureMappingData.byteLength,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        });
+        gpuDevice.queue.writeBuffer(textureMappingBuffer, 0, textureMappingData);
+        const textureMappingBindGroupEntry = new BufferBindGroupEntry(textureMappingBuffer, GPUShaderStage.VERTEX, "read-only-storage");
+        bindGroup.addEntry(Bindings.BlockModelTextureMappingBinding, textureMappingBindGroupEntry);
+    }
+    async setupTextureBindings(bindGroup, device) {
+        const texture = this.worldMirror.getTerrainMesh().getTexture();
+        const gpuTexture = new WebGPUTexture(texture);
+        bindGroup.addEntry(Bindings.BlockModelTextureBinding, gpuTexture);
+    }
+    async setupTextureSamplerBindings(bindGroup, device) {
+        const textureSampler = new TextureSampler();
+        bindGroup.addEntry(Bindings.BlockModelTextureSamplerBinding, textureSampler);
+    }
+    draw(renderPass, commandEncoder) {
+        const gpuDevice = this.getGraphicsDevice().getDevice();
+        for (const chunk of this.worldMirror.getVisibleChunks()) {
+            gpuDevice.queue.writeBuffer(this.indirectDrawBuffer, 0, chunk.getIndirectDrawCalls());
+            renderPass.drawIndirect(this.indirectDrawBuffer, 0);
+        }
     }
 }
 
@@ -2365,6 +2905,15 @@ class MeshAssembler {
             xOffset += texture.getTextureWidth();
             textureIndex++;
         }
+        canvas.convertToBlob().then(blob => {
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+            document.body.appendChild(img);
+        });
         const texture = Texture.fromImageData(context.getImageData(0, 0, size.x, size.y));
         return { texturePositions, texture };
     }
@@ -2430,12 +2979,19 @@ class WebGPUInstancedData extends InstancedData {
     constructor(assembledMesh, chunkData) {
         super(chunkData);
         this.assembledMesh = assembledMesh;
+        this.indirectCalls = new ArrayBuffer(ChunkDataReferencer.cells * 16);
     }
     update() {
         super.update();
-        this.indirectCalls = new ArrayBuffer(this.segments.length * 16);
         const indirectCalls = new Uint32Array(this.indirectCalls);
-        for (let i = 0; i < this.segments.length; i++) {
+        for (let i = 0; i < this.indirectCalls.byteLength / 16; i++) {
+            if (i >= this.segments.length) {
+                indirectCalls[i * 4] = 0;
+                indirectCalls[i * 4 + 1] = 0;
+                indirectCalls[i * 4 + 2] = 0;
+                indirectCalls[i * 4 + 3] = 0;
+                continue;
+            }
             const segment = this.segments[i];
             const model = segment.getModel();
             if (!model)
@@ -2456,19 +3012,6 @@ class WebGPUInstancedData extends InstancedData {
     }
 }
 
-var WebGPUUtils;
-(function (WebGPUUtils) {
-    function createIndirectCallBuffer(device, calls) {
-        const buffer = device.createBuffer({
-            size: calls.byteLength,
-            usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.STORAGE
-        });
-        device.queue.writeBuffer(buffer, 0, calls);
-        return buffer;
-    }
-    WebGPUUtils.createIndirectCallBuffer = createIndirectCallBuffer;
-})(WebGPUUtils || (WebGPUUtils = {}));
-
 class WebGPUChunkMirror {
     position;
     worldMirror;
@@ -2480,56 +3023,11 @@ class WebGPUChunkMirror {
         this.chunk = this.worldMirror.getWorld().getChunk(this.position);
         this.instancedData = new WebGPUInstancedData(worldMirror.getTerrainMesh(), this.chunk.getChunkData());
     }
-    renderChunk(renderPassEncoder) {
-        const instanceCalls = this.instancedData.getIndirectCalls();
-        const callBuffer = WebGPUUtils.createIndirectCallBuffer(this.worldMirror.getWorldRenderer().getGPUDevice(), instanceCalls);
-        renderPassEncoder.drawIndirect(callBuffer, 0);
-        callBuffer.destroy();
+    getIndirectDrawCalls() {
+        return this.instancedData.getIndirectCalls();
     }
     getPosition() {
         return this.position;
-    }
-}
-
-class WebGPUTexture {
-    source;
-    texture;
-    bindGroup;
-    renderer;
-    constructor(source) {
-        this.source = source;
-    }
-    getTexture() {
-        return this.source;
-    }
-    bindRenderer(renderer) {
-        this.renderer = renderer;
-    }
-    setup() {
-        const device = this.renderer.getGPUDevice();
-        const pipeline = this.renderer.getGPURenderPipeline();
-        this.texture = device.createTexture({
-            size: [
-                this.source.getTextureWidth(),
-                this.source.getTextureHeight()
-            ],
-            format: 'rgba8unorm',
-            usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING
-        });
-        device.queue.writeTexture({ texture: this.texture }, this.source.toDataArray(), { bytesPerRow: this.source.getTextureWidth() * 4 }, [this.source.getTextureWidth(), this.source.getTextureHeight()]);
-        const sampler = device.createSampler();
-        this.bindGroup = device.createBindGroup({
-            layout: pipeline.getBindGroupLayout(2),
-            entries: [
-                { binding: 0, resource: sampler },
-                { binding: 1, resource: this.texture.createView() },
-            ],
-        });
-    }
-    addToRenderPass(renderPassEncoder) {
-        if (!this.bindGroup)
-            throw new Error('Texture not instantiated');
-        renderPassEncoder.setBindGroup(2, this.bindGroup);
     }
 }
 
@@ -2541,61 +3039,56 @@ class WebGPUWorldMirror extends RenderWorldMirror {
         super();
         this.renderer = renderer;
     }
-    setup() {
+    async setup(device) {
         const meshAssembler = new MeshAssembler(Registries.blockModels.values());
         this.terrainMesh = meshAssembler.assembleMeshes();
         this.terrainTexture = new WebGPUTexture(this.terrainMesh.getTexture());
-        this.terrainTexture.bindRenderer(this.renderer);
-        this.terrainTexture.setup();
+        await this.terrainTexture.setup(device);
     }
     getWorld() {
         return this.renderer.getWorld();
     }
     getPerspective() {
-        throw this.renderer.getPerspective();
+        return this.renderer.getPerspective();
     }
     createRenderChunkMirror(position) {
-        throw new WebGPUChunkMirror(position, this);
+        return new WebGPUChunkMirror(position, this);
     }
     getTerrainMesh() {
         return this.terrainMesh;
     }
-    renderWorld(renderPassEncoder) {
-        for (const chunk of this.getChunks()) {
-            chunk.renderChunk(renderPassEncoder);
-        }
-    }
     getWorldRenderer() {
         return this.renderer;
+    }
+    getVisibleChunks() {
+        return this.getChunks();
     }
 }
 
 class WebGPURenderer {
     renderer;
-    canvas;
-    context;
     device;
     world;
     renderedWorld;
-    pipeline;
+    passes;
+    bindGroupManager;
+    camera;
     perspective;
     projector = new Projector(75, 1, 0.1, 1000);
     constructor(renderer) {
         this.renderer = renderer;
-        this.canvas = document.createElement('canvas');
         this.renderedWorld = new WebGPUWorldMirror(this);
-    }
-    getGPUDevice() {
-        return this.device;
-    }
-    getGPUContext() {
-        return this.context;
-    }
-    getGPURenderPipeline() {
-        return this.pipeline;
+        this.device = new GraphicsDevice(document.createElement('canvas'), this);
+        this.bindGroupManager = new BindGroupManager();
+        const terrainRenderPass = new TerrainRenderPass(this.renderedWorld);
+        terrainRenderPass.setBindGroupManager(this.bindGroupManager);
+        this.passes = [
+            new ClearRenderPass(new Color(0, 0.1, 0.2, 1)),
+            terrainRenderPass
+        ];
     }
     getCanvas() {
-        return this.canvas;
+        return this.device.getCanvas();
     }
     getRenderer() {
         return this.renderer;
@@ -2609,52 +3102,34 @@ class WebGPURenderer {
         return this.world;
     }
     async setupWorldRenderer() {
-        console.log("Initializing WebGPU");
-        if (!navigator.gpu) {
-            throw new Error('WebGPU is not supported');
+        await this.device.setup();
+        this.camera = new Camera();
+        await this.camera.setup(this.device);
+        this.bindGroupManager.addBindGroup(this.camera.getCameraBindGroup());
+        await this.renderedWorld.setup(this.device);
+        for (const pass of this.passes) {
+            await pass.setupBindings(this.device);
         }
-        const adapter = await navigator.gpu.requestAdapter();
-        if (!adapter) {
-            throw new Error('No useable adapter found');
+        await this.bindGroupManager.setup(this.device);
+        for (const pass of this.passes) {
+            await pass.setup(this.device);
         }
-        this.device = await adapter.requestDevice();
-        this.canvas = document.createElement('canvas');
-        this.context = this.canvas.getContext('webgpu');
-        const format = navigator.gpu.getPreferredCanvasFormat();
-        this.context.configure({
-            device: this.device,
-            format: format
-        });
-        console.log("Building pipeline");
-        this.renderedWorld.setup();
     }
     render() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-        this.projector.setAspectRatio(this.canvas.width / this.canvas.height);
+        const canvas = this.device.getCanvas();
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        this.projector.setAspectRatio(canvas.width / canvas.height);
         this.perspective.updatePerspective();
         this.renderedWorld.updateRenderedWorld();
-        const commandEncoder = this.createCommandEncoder();
-        const renderPassEncoder = this.createRenderPassEncoder(commandEncoder);
-        this.renderedWorld.renderWorld(renderPassEncoder);
-        renderPassEncoder.end();
-        this.device.queue.submit([commandEncoder.finish()]);
-    }
-    createCommandEncoder() {
-        return this.device.createCommandEncoder();
-    }
-    createRenderPassEncoder(commandEncoder) {
-        const renderPassDescriptor = {
-            colorAttachments: [
-                {
-                    clearValue: { r: 0.0, g: 0.5, b: 1.0, a: 1.0 },
-                    loadOp: "clear",
-                    storeOp: "store",
-                    view: this.context.getCurrentTexture().createView()
-                }
-            ]
-        };
-        return commandEncoder.beginRenderPass(renderPassDescriptor);
+        const gpuDevice = this.device.getDevice();
+        const commandEncoder = gpuDevice.createCommandEncoder({
+            label: "Renderer Command Encoder"
+        });
+        for (const renderPass of this.passes) {
+            renderPass.render(commandEncoder);
+        }
+        this.device.getDevice().queue.submit([commandEncoder.finish()]);
     }
     getPerspective() {
         return this.perspective;
@@ -2667,6 +3142,9 @@ class WebGPURenderer {
     }
     setProjector(projector) {
         this.projector = projector;
+    }
+    getCamera() {
+        return this.camera;
     }
     static async isSupported() {
         if (!navigator.gpu)
@@ -2704,13 +3182,42 @@ class Renderer {
         else {
             throw new Error("No supported world renderer found");
         }
-        this.worldRenderer.setupWorldRenderer();
         this.worldRenderer.setWorld(this.world);
+        await this.worldRenderer.setupWorldRenderer();
     }
     render() {
         if (!this.worldRenderer)
             throw new Error('No world renderer set');
         this.worldRenderer.render();
+    }
+}
+
+class EntityPerspective {
+    entity;
+    matrix;
+    constructor(entity) {
+        this.entity = entity;
+    }
+    getChunkLocation() {
+        if (!this.entity.getParentChunk()) {
+            throw new Error("Cannot get chunk location of unbound entity");
+        }
+        return this.entity.getParentChunk().getPosition();
+    }
+    getTransformationMatrix() {
+        return this.matrix;
+    }
+    getRenderDistance() {
+        return 10;
+    }
+    updatePerspective() {
+        this.matrix = this.computeTransformationMatrix();
+    }
+    computeTransformationMatrix() {
+        let matrix = new Matrix4();
+        matrix.multiply(Matrix4.createTranslation(this.entity.getPosition()));
+        matrix.multiply(Matrix4.createRotation(this.entity.getRotation()));
+        return matrix;
     }
 }
 
@@ -2767,7 +3274,7 @@ class Client extends Game {
         await super.start();
         await this.renderer.setupRenderer();
         const playerPrototype = Registries.entities.get('player');
-        const playerEntity = playerPrototype.instantiate();
+        const playerEntity = playerPrototype.createEntity();
         this.getWorld().addEntity(playerEntity);
         const playerPerspective = new EntityPerspective(playerEntity);
         this.getRenderer().getWorldRenderer().setPerspective(playerPerspective);
