@@ -14,6 +14,6 @@ export abstract class PositionedModelComponent implements ModelComponent {
     }
 
     abstract getVertexPositions(parentPosition: Vector3D): Float32Array;
-    abstract getTextureMappings(): Uint32Array;
+    abstract getTextureMappings(): Float32Array;
     abstract getTextureIds(): Uint32Array;
 }

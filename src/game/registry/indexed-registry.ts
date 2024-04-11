@@ -10,7 +10,7 @@ export class IndexedRegistry<T extends IndexedRegistryItem> extends Registry<T> 
         return this.idsToItems.get(id);
     }
 
-    async allocate() {
+    async setup() {
         this.idsToItems = new Map();
 
         let id = 0;

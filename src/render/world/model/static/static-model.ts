@@ -2,6 +2,6 @@ import { IndexedRegistryItem } from "../../../../game/registry/indexed-registry-
 
 export interface StaticModel extends IndexedRegistryItem {
     getVertexPositions(): Float32Array;
-    getTextureMappings(): Uint32Array;
+    getTextureMappings(): Float32Array;
     getTextureIds(): Uint32Array;
 }

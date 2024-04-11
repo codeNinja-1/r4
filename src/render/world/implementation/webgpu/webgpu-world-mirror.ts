@@ -38,6 +38,14 @@ export class WebGPUWorldMirror extends RenderWorldMirror<WebGPUChunkMirror> {
         return new WebGPUChunkMirror(position, this);
     }
 
+    updateRenderedWorld(): void {
+        super.updateRenderedWorld();
+
+        for (const chunk of this.getChunks()) {
+            chunk.update();
+        }
+    }
+
     getTerrainMesh(): AssembledMesh {
         return this.terrainMesh;
     }

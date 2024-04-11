@@ -2,6 +2,7 @@ import { PhysicalEntityProperties } from "../../physics/entity/physical-entity-p
 import { PhysicalEntityState } from "../../physics/entity/physical-entity-state.js";
 import { DynamicModel } from "../../render/world/model/dynamic/dynamic-model.js";
 import { Rotation } from "../../utils/rotation/rotation.js";
+import { HandleableVector3D } from "../../utils/vector3d/handleable-vector3d.js";
 import { Vector3D } from "../../utils/vector3d/vector3d.js";
 import { ChunkInterface } from "../chunk-interface.js";
 import { EntityPrototype } from "../prototype/entity-prototype.js";
@@ -14,11 +15,11 @@ export interface Entity {
     setParentChunk(chunk: ChunkInterface | null): void;
     getParentChunk(): ChunkInterface | null;
 
-    tickEntity(delta: number): void;
+    tickEntity(delta: number): Promise<void>;
 
     canLoadChunks(): boolean;
 
-    getPosition(): Vector3D;
+    getPosition(): HandleableVector3D;
     setPosition(x: number, y: number, z: number): void;
     setPosition(position: Vector3D): void;
 

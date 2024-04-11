@@ -5,7 +5,18 @@ import { ModelComponent } from "./model-component.js";
 import { StaticModel } from "./static-model.js";
 
 export class BlockModel extends IndexedRegistryItem implements StaticModel {
-    components: Set<ModelComponent> = new Set();
+    private components: Set<ModelComponent> = new Set();
+    private transparent: boolean = false;
+
+    constructor(options?: { transparent?: boolean }) {
+        super();
+
+        this.transparent = options?.transparent ?? false;
+    }
+
+    isTransparent(): boolean {
+        return this.transparent;
+    }
 
     getVertexPositions(): Float32Array {
         const components = Array.from(this.components);
@@ -15,12 +26,12 @@ export class BlockModel extends IndexedRegistryItem implements StaticModel {
         return new Float32Array(buffer);
     }
 
-    getTextureMappings(): Uint32Array {
+    getTextureMappings(): Float32Array {
         const components = Array.from(this.components);
         const textureMappings = components.map(component => component.getTextureMappings());
         const buffer = DataUtils.concat(textureMappings);
 
-        return new Uint32Array(buffer);
+        return new Float32Array(buffer);
     }
 
     getTextureIds(): Uint32Array {

@@ -1,3 +1,4 @@
+import { Axis } from "../rotation/axis.js";
 import { Rotation } from "../rotation/rotation.js";
 import { ImmutableVector3D } from "../vector3d/immutable-vector3d.js";
 import { MutableVector3D } from "../vector3d/mutable-vector3d.js";
@@ -194,97 +195,46 @@ export class Matrix4 {
     static createRotation(rotation: Rotation, target: Matrix4 = new Matrix4()) {
         let matrix = target || new Matrix4();
 
-        matrix.multiply(Matrix4.createRotationY(rotation.yaw));
-        matrix.multiply(Matrix4.createRotationX(rotation.pitch));
-        matrix.multiply(Matrix4.createRotationZ(rotation.roll));
+        matrix.multiply(Matrix4.createWorldAxisRotation(Axis.Y, rotation.yaw));
+        matrix.multiply(Matrix4.createWorldAxisRotation(Axis.X, rotation.pitch));
+        matrix.multiply(Matrix4.createWorldAxisRotation(Axis.Z, rotation.roll));
 
         return matrix;
     }
 
-    static createRotationX(angle: number, target: Matrix4 = new Matrix4()) {
-        const cos = Math.cos(angle);
+    static createWorldAxisRotation(axis: Axis, angle: number): Matrix4 {
         const sin = Math.sin(angle);
-
-        target.data[0] = 1;
-        target.data[1] = 0;
-        target.data[2] = 0;
-        target.data[3] = 0;
-
-        target.data[4] = 0;
-        target.data[5] = cos;
-        target.data[6] = sin;
-        target.data[7] = 0;
-
-        target.data[8] = 0;
-        target.data[9] = -sin;
-        target.data[10] = cos;
-        target.data[11] = 0;
-
-        target.data[12] = 0;
-        target.data[13] = 0;
-        target.data[14] = 0;
-        target.data[15] = 1;
-
-        return target;
-    }
-
-    static createRotationY(angle: number, target: Matrix4 = new Matrix4()) {
         const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
 
-        target.data[0] = cos;
-        target.data[1] = 0;
-        target.data[2] = -sin;
-        target.data[3] = 0;
+        if (axis == Axis.X) {
+            return new Matrix4([
+                1, 0, 0, 0,
+                0, cos, sin, 0,
+                0, -sin, cos, 0,
+                0, 0, 0, 1
+            ]);
+        } else if (axis == Axis.Y) {
+            return new Matrix4([
+                cos, 0, -sin, 0,
+                0, 1, 0, 0,
+                sin, 0, cos, 0,
+                0, 0, 0, 1
+            ]);
+        } else if (axis == Axis.Z) {
+            return new Matrix4([
+                cos, sin, 0, 0,
+                -sin, cos, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            ]);
+        }
 
-        target.data[4] = 0;
-        target.data[5] = 1;
-        target.data[6] = 0;
-        target.data[7] = 0;
-
-        target.data[8] = sin;
-        target.data[9] = 0;
-        target.data[10] = cos;
-        target.data[11] = 0;
-
-        target.data[12] = 0;
-        target.data[13] = 0;
-        target.data[14] = 0;
-        target.data[15] = 1;
-
-        return target;
-    }
-
-    static createRotationZ(angle: number, target: Matrix4 = new Matrix4()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-
-        target.data[0] = cos;
-        target.data[1] = sin;
-        target.data[2] = 0;
-        target.data[3] = 0;
-
-        target.data[4] = -sin;
-        target.data[5] = cos;
-        target.data[6] = 0;
-        target.data[7] = 0;
-
-        target.data[8] = 0;
-        target.data[9] = 0;
-        target.data[10] = 1;
-        target.data[11] = 0;
-
-        target.data[12] = 0;
-        target.data[13] = 0;
-        target.data[14] = 0;
-        target.data[15] = 1;
-
-        return target;
+        return new Matrix4();
     }
 
     static createPerspective(fov: number, aspect: number, near: number, far: number, target: Matrix4 = new Matrix4()) {
-        const f = 1 / Math.tan(fov / 2);
-        const nf = 1 / (near - far);
+        const f = Math.tan(Math.PI * 0.5 - 0.5 * fov);
+        const rangeInv = 1 / (near - far);
 
         target.data[0] = f / aspect;
         target.data[1] = 0;
@@ -298,13 +248,39 @@ export class Matrix4 {
 
         target.data[8] = 0;
         target.data[9] = 0;
-        target.data[10] = (far + near) * nf;
+        target.data[10] = far * rangeInv;
         target.data[11] = -1;
 
         target.data[12] = 0;
         target.data[13] = 0;
-        target.data[14] = 2 * far * near * nf;
+        target.data[14] = near * far * rangeInv;
         target.data[15] = 0;
+
+        return target;
+    }
+
+    static identity(target?: Matrix4): Matrix4 {
+        if (!target) return new Matrix4();
+
+        target.data[0] = 1;
+        target.data[1] = 0;
+        target.data[2] = 0;
+        target.data[3] = 0;
+
+        target.data[4] = 0;
+        target.data[5] = 1;
+        target.data[6] = 0;
+        target.data[7] = 0;
+
+        target.data[8] = 0;
+        target.data[9] = 0;
+        target.data[10] = 1;
+        target.data[11] = 0;
+
+        target.data[12] = 0;
+        target.data[13] = 0;
+        target.data[14] = 0;
+        target.data[15] = 1;
 
         return target;
     }

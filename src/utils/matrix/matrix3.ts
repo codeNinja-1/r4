@@ -51,9 +51,9 @@ export class Matrix3 {
 
         const x = b.x, y = b.y, z = b.z;
 
-        c.x = a[0] * x + a[4] * y + a[8] * z;
-        c.y = a[1] * x + a[5] * y + a[9] * z;
-        c.z = a[2] * x + a[6] * y + a[10] * z;
+        c.x = a[0] * x + a[3] * y + a[6] * z;
+        c.y = a[1] * x + a[4] * y + a[7] * z;
+        c.z = a[2] * x + a[5] * y + a[8] * z;
 
         return target;
     }

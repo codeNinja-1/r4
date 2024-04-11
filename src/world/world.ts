@@ -80,21 +80,21 @@ export class World {
         }
     }
 
-    tick(delta: number) {
+    async tick(delta: number) {
         for (const entity of this.entityIdMapping.values()) {
-            entity.tickEntity(delta);
+            await entity.tickEntity(delta);
         }
 
         for (const [ _id, chunk ] of this.chunks) {
-            chunk.tickChunk();
+            await chunk.tickChunk();
         }
 
         this._validateDisconnectedEntities();
     }
 
-    loadChunk(x: number, z: number): ChunkInterface.Placeholder;
-    loadChunk(position: Vector2D): ChunkInterface.Placeholder;
-    loadChunk(x: Vector2D | number, z?: number): ChunkInterface.Placeholder {
+    loadChunk(x: number, z: number): ChunkInterface;
+    loadChunk(position: Vector2D): ChunkInterface;
+    loadChunk(x: Vector2D | number, z?: number): ChunkInterface {
         let position: Vector2D;
 
         if (typeof x === 'number') {
@@ -107,9 +107,8 @@ export class World {
             position = new ImmutableVector2D(x.x, x.y);
         }
 
-        if (this.getChunk(position)) {
-            throw new Error("Cannot load chunk where another chunk already exists");
-        }
+        let presentChunk = this.getChunk(position);
+        if (presentChunk) { return presentChunk; }
 
         if (!this.loader) {
             throw new Error("Cannot load chunk: World has no loader");

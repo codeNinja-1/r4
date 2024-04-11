@@ -35,9 +35,9 @@ export class Renderer {
         await this.worldRenderer.setupWorldRenderer();
     }
 
-    render(): void {
+    async render(): Promise<void> {
         if (!this.worldRenderer) throw new Error('No world renderer set');
 
-        this.worldRenderer.render();
+        await this.worldRenderer.render();
     }
 }

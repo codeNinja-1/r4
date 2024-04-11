@@ -51,7 +51,7 @@ export class Chunk extends ChunkInterface.NonPlaceholder {
         this.chunkData = new ChunkData();
     }
 
-    tickChunk() {
-        this.chunkData.tickChunkData();
+    async tickChunk() {
+        await this.chunkData.tickChunkData();
     }
 }

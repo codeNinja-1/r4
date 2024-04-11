@@ -3,7 +3,7 @@ import { Matrix4 } from "../../../utils/matrix/matrix4.js";
 export class Projector {
     private projectionMatrix: Matrix4 | null = null;
 
-    constructor(private fieldOfView = 45, private aspect = 1, private near = 0.1, private far = 1000) {
+    constructor(private fieldOfView = Math.PI / 180 * 75, private aspect = 1, private near = 0.1, private far = 1000) {
     }
 
     getFieldOfView(): number {

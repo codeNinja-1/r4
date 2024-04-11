@@ -32,5 +32,5 @@ export class PlaceholderChunk extends ChunkInterface.Placeholder {
 
     unloadChunk(): void {}
     setupChunk(): void {}
-    tickChunk(): void {}
+    async tickChunk(): Promise<void> {}
 }

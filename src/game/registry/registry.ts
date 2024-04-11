@@ -24,4 +24,7 @@ export class Registry<T> {
     values() {
         return this.data.values();
     }
+
+    async setup(): Promise<void> {
+    }
 }

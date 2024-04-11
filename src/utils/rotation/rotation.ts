@@ -33,4 +33,8 @@ export class Rotation {
     clone() {
         return new Rotation(this.yaw, this.pitch, this.roll);
     }
+
+    static fromDegrees(yaw: number, pitch: number, roll: number) {
+        return new Rotation(Math.PI / 180 * yaw, Math.PI / 180 * pitch, Math.PI / 180 * roll);
+    }
 }

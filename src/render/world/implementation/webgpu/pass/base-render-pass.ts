@@ -10,6 +10,7 @@ export abstract class BaseRenderPass implements RenderPass {
     private pipelineLayout: GPUPipelineLayout;
     private bindGroupManager: PipelineBindGroupManager;
     private device: GraphicsDevice;
+    protected depthTest: boolean = false;
 
     setBindGroupManager(bindGroupManager: BindGroupManager) {
         this.bindGroupManager = new PipelineBindGroupManager(bindGroupManager);
@@ -19,10 +20,18 @@ export abstract class BaseRenderPass implements RenderPass {
         const gpuDevice = device.getDevice();
 
         const layoutDescriptor: Partial<GPUPipelineLayoutDescriptor> = {};
+
         this.bindGroupManager.addBindGroupsToPipelineLayout(layoutDescriptor);
+
+        console.log(layoutDescriptor);
+
         this.pipelineLayout = gpuDevice.createPipelineLayout(layoutDescriptor as GPUPipelineLayoutDescriptor);
 
         this.descriptor.layout = this.pipelineLayout;
+
+        if (this.depthTest) {
+            device.getRenderer().getDepthTexture().addToPipelineDescriptor(this.descriptor);
+        }
 
         this.pipeline = gpuDevice.createRenderPipeline(this.descriptor as GPURenderPipelineDescriptor);
 
@@ -68,28 +77,38 @@ export abstract class BaseRenderPass implements RenderPass {
         return this.pipelineLayout;
     }
 
-    render(commandEncoder: GPUCommandEncoder): void {
-        const renderPass = commandEncoder.beginRenderPass({
+    protected createCommandEncoder(passLabel: string): GPUCommandEncoder {
+        return this.device.getDevice().createCommandEncoder({
+            label: `${passLabel} / Command Encoder`
+        });
+    }
+
+    protected createRenderPass(commandEncoder: GPUCommandEncoder): GPURenderPassEncoder {
+        const renderPassDescriptor: Partial<GPURenderPassDescriptor> = {
             colorAttachments: [
                 {
-                    view: this.device.getContext().getCurrentTexture().createView(),
+                    view: this.device.getContext().getCurrentTexture().createView({ label: "Canvas Texture [View]" }),
                     loadOp: "load",
                     storeOp: "store"
                 }
             ]
-        });
+        };
+
+        if (this.depthTest) {
+            this.device.getRenderer().getDepthTexture().addToRenderPassDescriptor(renderPassDescriptor);
+        }
+
+        const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor as GPURenderPassDescriptor);
 
         this.bindGroupManager.setBindGroupsOnRenderPassEncoder(renderPass);
         renderPass.setPipeline(this.pipeline);
 
-        this.draw(renderPass, commandEncoder);
-
-        renderPass.end();
+        return renderPass;
     }
+
+    abstract render(): Promise<void>;
 
     protected getGraphicsDevice(): GraphicsDevice {
         return this.device;
     }
-
-    protected abstract draw(renderPass: GPURenderPassEncoder, commandEncoder: GPUCommandEncoder): void;
 }

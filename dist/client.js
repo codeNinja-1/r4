@@ -1,9 +1,304 @@
-var GameRuntimeType;
-(function (GameRuntimeType) {
-    GameRuntimeType[GameRuntimeType["Singleplayer"] = 0] = "Singleplayer";
-    GameRuntimeType[GameRuntimeType["MultiplayerClient"] = 1] = "MultiplayerClient";
-    GameRuntimeType[GameRuntimeType["MultiplayerServer"] = 2] = "MultiplayerServer";
-})(GameRuntimeType || (GameRuntimeType = {}));
+/*
+ * A fast javascript implementation of simplex noise by Jonas Wagner
+
+Based on a speed-improved simplex noise algorithm for 2D, 3D and 4D in Java.
+Which is based on example code by Stefan Gustavson (stegu@itn.liu.se).
+With Optimisations by Peter Eastman (peastman@drizzle.stanford.edu).
+Better rank ordering method by Stefan Gustavson in 2012.
+
+ Copyright (c) 2022 Jonas Wagner
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+ */
+
+// 
+const F2 =  0.5 * (Math.sqrt(3.0) - 1.0);
+const G2 =  (3.0 - Math.sqrt(3.0)) / 6.0;
+const F3 = 1.0 / 3.0;
+const G3 = 1.0 / 6.0;
+// I'm really not sure why this | 0 (basically a coercion to int)
+// is making this faster but I get ~5 million ops/sec more on the
+// benchmarks across the board or a ~10% speedup.
+const fastFloor = (x) => Math.floor(x) | 0;
+const grad2 = /*#__PURE__*/ new Float64Array([1, 1,
+    -1, 1,
+    1, -1,
+    -1, -1,
+    1, 0,
+    -1, 0,
+    1, 0,
+    -1, 0,
+    0, 1,
+    0, -1,
+    0, 1,
+    0, -1]);
+// double seems to be faster than single or int's
+// probably because most operations are in double precision
+const grad3 = /*#__PURE__*/ new Float64Array([1, 1, 0,
+    -1, 1, 0,
+    1, -1, 0,
+    -1, -1, 0,
+    1, 0, 1,
+    -1, 0, 1,
+    1, 0, -1,
+    -1, 0, -1,
+    0, 1, 1,
+    0, -1, 1,
+    0, 1, -1,
+    0, -1, -1]);
+/**
+ * Creates a 2D noise function
+ * @param random the random function that will be used to build the permutation table
+ * @returns {NoiseFunction2D}
+ */
+function createNoise2D(random = Math.random) {
+    const perm = buildPermutationTable(random);
+    // precalculating this yields a little ~3% performance improvement.
+    const permGrad2x = new Float64Array(perm).map(v => grad2[(v % 12) * 2]);
+    const permGrad2y = new Float64Array(perm).map(v => grad2[(v % 12) * 2 + 1]);
+    return function noise2D(x, y) {
+        // if(!isFinite(x) || !isFinite(y)) return 0;
+        let n0 = 0; // Noise contributions from the three corners
+        let n1 = 0;
+        let n2 = 0;
+        // Skew the input space to determine which simplex cell we're in
+        const s = (x + y) * F2; // Hairy factor for 2D
+        const i = fastFloor(x + s);
+        const j = fastFloor(y + s);
+        const t = (i + j) * G2;
+        const X0 = i - t; // Unskew the cell origin back to (x,y) space
+        const Y0 = j - t;
+        const x0 = x - X0; // The x,y distances from the cell origin
+        const y0 = y - Y0;
+        // For the 2D case, the simplex shape is an equilateral triangle.
+        // Determine which simplex we are in.
+        let i1, j1; // Offsets for second (middle) corner of simplex in (i,j) coords
+        if (x0 > y0) {
+            i1 = 1;
+            j1 = 0;
+        } // lower triangle, XY order: (0,0)->(1,0)->(1,1)
+        else {
+            i1 = 0;
+            j1 = 1;
+        } // upper triangle, YX order: (0,0)->(0,1)->(1,1)
+        // A step of (1,0) in (i,j) means a step of (1-c,-c) in (x,y), and
+        // a step of (0,1) in (i,j) means a step of (-c,1-c) in (x,y), where
+        // c = (3-sqrt(3))/6
+        const x1 = x0 - i1 + G2; // Offsets for middle corner in (x,y) unskewed coords
+        const y1 = y0 - j1 + G2;
+        const x2 = x0 - 1.0 + 2.0 * G2; // Offsets for last corner in (x,y) unskewed coords
+        const y2 = y0 - 1.0 + 2.0 * G2;
+        // Work out the hashed gradient indices of the three simplex corners
+        const ii = i & 255;
+        const jj = j & 255;
+        // Calculate the contribution from the three corners
+        let t0 = 0.5 - x0 * x0 - y0 * y0;
+        if (t0 >= 0) {
+            const gi0 = ii + perm[jj];
+            const g0x = permGrad2x[gi0];
+            const g0y = permGrad2y[gi0];
+            t0 *= t0;
+            // n0 = t0 * t0 * (grad2[gi0] * x0 + grad2[gi0 + 1] * y0); // (x,y) of grad3 used for 2D gradient
+            n0 = t0 * t0 * (g0x * x0 + g0y * y0);
+        }
+        let t1 = 0.5 - x1 * x1 - y1 * y1;
+        if (t1 >= 0) {
+            const gi1 = ii + i1 + perm[jj + j1];
+            const g1x = permGrad2x[gi1];
+            const g1y = permGrad2y[gi1];
+            t1 *= t1;
+            // n1 = t1 * t1 * (grad2[gi1] * x1 + grad2[gi1 + 1] * y1);
+            n1 = t1 * t1 * (g1x * x1 + g1y * y1);
+        }
+        let t2 = 0.5 - x2 * x2 - y2 * y2;
+        if (t2 >= 0) {
+            const gi2 = ii + 1 + perm[jj + 1];
+            const g2x = permGrad2x[gi2];
+            const g2y = permGrad2y[gi2];
+            t2 *= t2;
+            // n2 = t2 * t2 * (grad2[gi2] * x2 + grad2[gi2 + 1] * y2);
+            n2 = t2 * t2 * (g2x * x2 + g2y * y2);
+        }
+        // Add contributions from each corner to get the final noise value.
+        // The result is scaled to return values in the interval [-1,1].
+        return 70.0 * (n0 + n1 + n2);
+    };
+}
+/**
+ * Creates a 3D noise function
+ * @param random the random function that will be used to build the permutation table
+ * @returns {NoiseFunction3D}
+ */
+function createNoise3D(random = Math.random) {
+    const perm = buildPermutationTable(random);
+    // precalculating these seems to yield a speedup of over 15%
+    const permGrad3x = new Float64Array(perm).map(v => grad3[(v % 12) * 3]);
+    const permGrad3y = new Float64Array(perm).map(v => grad3[(v % 12) * 3 + 1]);
+    const permGrad3z = new Float64Array(perm).map(v => grad3[(v % 12) * 3 + 2]);
+    return function noise3D(x, y, z) {
+        let n0, n1, n2, n3; // Noise contributions from the four corners
+        // Skew the input space to determine which simplex cell we're in
+        const s = (x + y + z) * F3; // Very nice and simple skew factor for 3D
+        const i = fastFloor(x + s);
+        const j = fastFloor(y + s);
+        const k = fastFloor(z + s);
+        const t = (i + j + k) * G3;
+        const X0 = i - t; // Unskew the cell origin back to (x,y,z) space
+        const Y0 = j - t;
+        const Z0 = k - t;
+        const x0 = x - X0; // The x,y,z distances from the cell origin
+        const y0 = y - Y0;
+        const z0 = z - Z0;
+        // For the 3D case, the simplex shape is a slightly irregular tetrahedron.
+        // Determine which simplex we are in.
+        let i1, j1, k1; // Offsets for second corner of simplex in (i,j,k) coords
+        let i2, j2, k2; // Offsets for third corner of simplex in (i,j,k) coords
+        if (x0 >= y0) {
+            if (y0 >= z0) {
+                i1 = 1;
+                j1 = 0;
+                k1 = 0;
+                i2 = 1;
+                j2 = 1;
+                k2 = 0;
+            } // X Y Z order
+            else if (x0 >= z0) {
+                i1 = 1;
+                j1 = 0;
+                k1 = 0;
+                i2 = 1;
+                j2 = 0;
+                k2 = 1;
+            } // X Z Y order
+            else {
+                i1 = 0;
+                j1 = 0;
+                k1 = 1;
+                i2 = 1;
+                j2 = 0;
+                k2 = 1;
+            } // Z X Y order
+        }
+        else { // x0<y0
+            if (y0 < z0) {
+                i1 = 0;
+                j1 = 0;
+                k1 = 1;
+                i2 = 0;
+                j2 = 1;
+                k2 = 1;
+            } // Z Y X order
+            else if (x0 < z0) {
+                i1 = 0;
+                j1 = 1;
+                k1 = 0;
+                i2 = 0;
+                j2 = 1;
+                k2 = 1;
+            } // Y Z X order
+            else {
+                i1 = 0;
+                j1 = 1;
+                k1 = 0;
+                i2 = 1;
+                j2 = 1;
+                k2 = 0;
+            } // Y X Z order
+        }
+        // A step of (1,0,0) in (i,j,k) means a step of (1-c,-c,-c) in (x,y,z),
+        // a step of (0,1,0) in (i,j,k) means a step of (-c,1-c,-c) in (x,y,z), and
+        // a step of (0,0,1) in (i,j,k) means a step of (-c,-c,1-c) in (x,y,z), where
+        // c = 1/6.
+        const x1 = x0 - i1 + G3; // Offsets for second corner in (x,y,z) coords
+        const y1 = y0 - j1 + G3;
+        const z1 = z0 - k1 + G3;
+        const x2 = x0 - i2 + 2.0 * G3; // Offsets for third corner in (x,y,z) coords
+        const y2 = y0 - j2 + 2.0 * G3;
+        const z2 = z0 - k2 + 2.0 * G3;
+        const x3 = x0 - 1.0 + 3.0 * G3; // Offsets for last corner in (x,y,z) coords
+        const y3 = y0 - 1.0 + 3.0 * G3;
+        const z3 = z0 - 1.0 + 3.0 * G3;
+        // Work out the hashed gradient indices of the four simplex corners
+        const ii = i & 255;
+        const jj = j & 255;
+        const kk = k & 255;
+        // Calculate the contribution from the four corners
+        let t0 = 0.6 - x0 * x0 - y0 * y0 - z0 * z0;
+        if (t0 < 0)
+            n0 = 0.0;
+        else {
+            const gi0 = ii + perm[jj + perm[kk]];
+            t0 *= t0;
+            n0 = t0 * t0 * (permGrad3x[gi0] * x0 + permGrad3y[gi0] * y0 + permGrad3z[gi0] * z0);
+        }
+        let t1 = 0.6 - x1 * x1 - y1 * y1 - z1 * z1;
+        if (t1 < 0)
+            n1 = 0.0;
+        else {
+            const gi1 = ii + i1 + perm[jj + j1 + perm[kk + k1]];
+            t1 *= t1;
+            n1 = t1 * t1 * (permGrad3x[gi1] * x1 + permGrad3y[gi1] * y1 + permGrad3z[gi1] * z1);
+        }
+        let t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
+        if (t2 < 0)
+            n2 = 0.0;
+        else {
+            const gi2 = ii + i2 + perm[jj + j2 + perm[kk + k2]];
+            t2 *= t2;
+            n2 = t2 * t2 * (permGrad3x[gi2] * x2 + permGrad3y[gi2] * y2 + permGrad3z[gi2] * z2);
+        }
+        let t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3;
+        if (t3 < 0)
+            n3 = 0.0;
+        else {
+            const gi3 = ii + 1 + perm[jj + 1 + perm[kk + 1]];
+            t3 *= t3;
+            n3 = t3 * t3 * (permGrad3x[gi3] * x3 + permGrad3y[gi3] * y3 + permGrad3z[gi3] * z3);
+        }
+        // Add contributions from each corner to get the final noise value.
+        // The result is scaled to stay just inside [-1,1]
+        return 32.0 * (n0 + n1 + n2 + n3);
+    };
+}
+/**
+ * Builds a random permutation table.
+ * This is exported only for (internal) testing purposes.
+ * Do not rely on this export.
+ * @private
+ */
+function buildPermutationTable(random) {
+    const tableSize = 512;
+    const p = new Uint8Array(tableSize);
+    for (let i = 0; i < tableSize / 2; i++) {
+        p[i] = i;
+    }
+    for (let i = 0; i < tableSize / 2 - 1; i++) {
+        const r = i + ~~(random() * (256 - i));
+        const aux = p[i];
+        p[i] = p[r];
+        p[r] = aux;
+    }
+    for (let i = 256; i < tableSize; i++) {
+        p[i] = p[i - 256];
+    }
+    return p;
+}
 
 class Registry {
     data;
@@ -25,6 +320,8 @@ class Registry {
     values() {
         return this.data.values();
     }
+    async setup() {
+    }
 }
 
 class IndexedRegistry extends Registry {
@@ -34,7 +331,7 @@ class IndexedRegistry extends Registry {
             return super.get(id);
         return this.idsToItems.get(id);
     }
-    async allocate() {
+    async setup() {
         this.idsToItems = new Map();
         let id = 0;
         for (const [name, item] of this.entries()) {
@@ -53,88 +350,6 @@ var Registries;
     Registries.textures = new IndexedRegistry();
     Registries.blockModels = new IndexedRegistry();
 })(Registries || (Registries = {}));
-
-class IndexedRegistryItem {
-    registeredId;
-    registeredName;
-    bindRegistryKeys(id, name) {
-        this.registeredId = id;
-        this.registeredName = name;
-    }
-    getRegisteredId() {
-        return this.registeredId;
-    }
-    getRegisteredName() {
-        return this.registeredName;
-    }
-}
-
-class Texture extends IndexedRegistryItem {
-    data;
-    width;
-    height;
-    constructor(data, width, height) {
-        super();
-        this.data = data;
-        this.width = width;
-        this.height = height;
-    }
-    getTextureWidth() {
-        return this.width;
-    }
-    getTextureHeight() {
-        return this.height;
-    }
-    toDataArray() {
-        return this.data;
-    }
-    toImageData() {
-        return new ImageData(this.data, this.width, this.height);
-    }
-    static fromImage(source) {
-        const canvas = new OffscreenCanvas(source.width, source.height);
-        const context = canvas.getContext('2d');
-        context.drawImage(source, 0, 0);
-        const imageData = context.getImageData(0, 0, source.width, source.height);
-        return Texture.fromImageData(imageData);
-    }
-    static fromImageData(imageData) {
-        return new Texture(imageData.data, imageData.width, imageData.height);
-    }
-    static fromDataArray(data, width, height) {
-        return new Texture(data, width, height);
-    }
-    static load(name) {
-        const url = '/assets/textures/' + name.replace(/\./g, '/') + '.png';
-        return new Promise((resolve, reject) => {
-            const image = new Image();
-            image.onload = () => {
-                const texture = Texture.fromImage(image);
-                Registries.textures.register(name, texture);
-                resolve(texture);
-            };
-            image.onerror = () => {
-                reject(new Error(`Failed to load image from ${url}`));
-            };
-            image.src = url;
-        });
-    }
-}
-
-var DataUtils;
-(function (DataUtils) {
-    function concat(buffers) {
-        const totalLength = buffers.reduce((total, buffer) => total + buffer.byteLength, 0);
-        const result = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const buffer of buffers) {
-            result.set(new Uint8Array(buffer), offset);
-            offset += buffer.byteLength;
-        }
-        return result.buffer;
-    }
-    DataUtils.concat = concat;
-})(DataUtils || (DataUtils = {}));
 
 class Vector3D {
     x;
@@ -332,257 +547,6 @@ class Vector3D {
     }
 }
 
-class ImmutableVector3D extends Vector3D {
-    constructor(x, y, z) {
-        if (x instanceof Vector3D)
-            super(x.x, x.y, x.z);
-        else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number')
-            super(x, y, z);
-        else
-            super(0, 0, 0);
-    }
-    _set(x, y, z) {
-        return new ImmutableVector3D(x, y, z);
-    }
-    set(x, y, z) {
-        throw new Error("Cannot set immutable vector");
-    }
-    static from(vector, format) {
-        const values = [...Vector3D._from(vector, format)];
-        return new ImmutableVector3D(values[0], values[1], values[2]);
-    }
-}
-
-class BlockModel extends IndexedRegistryItem {
-    components = new Set();
-    getVertexPositions() {
-        const components = Array.from(this.components);
-        const positions = components.map(component => component.getVertexPositions(new ImmutableVector3D()));
-        const buffer = DataUtils.concat(positions);
-        return new Float32Array(buffer);
-    }
-    getTextureMappings() {
-        const components = Array.from(this.components);
-        const textureMappings = components.map(component => component.getTextureMappings());
-        const buffer = DataUtils.concat(textureMappings);
-        return new Uint32Array(buffer);
-    }
-    getTextureIds() {
-        const components = Array.from(this.components);
-        const textureIds = components.map(component => component.getTextureIds());
-        const buffer = DataUtils.concat(textureIds);
-        return new Uint32Array(buffer);
-    }
-    add(...components) {
-        for (const component of components) {
-            this.components.add(component);
-        }
-    }
-    remove(...components) {
-        for (const component of components) {
-            this.components.delete(component);
-        }
-    }
-}
-
-class MutableVector3D extends Vector3D {
-    constructor(x, y, z) {
-        if (x instanceof Vector3D)
-            super(x.x, x.y, x.z);
-        else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number')
-            super(x, y, z);
-        else
-            super(0, 0, 0);
-    }
-    _set(x, y, z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-        return this;
-    }
-    static from(vector, format) {
-        const values = [...Vector3D._from(vector, format)];
-        return new MutableVector3D(values[0], values[1], values[2]);
-    }
-}
-
-class Matrix3 {
-    data;
-    constructor(data = [1, 0, 0, 0, 1, 0, 0, 0, 1]) {
-        this.data = data;
-    }
-    multiply(value) {
-        if (value instanceof Vector3D) {
-            return Matrix3.multiplyVector(this, value);
-        }
-        else if (value instanceof Matrix3) {
-            return Matrix3.multiply(this, value, this);
-        }
-        else {
-            throw new Error("Invalid arguments");
-        }
-    }
-    static multiply(matrix1, matrix2, target = new Matrix3()) {
-        const a = matrix1.data;
-        const b = matrix2.data;
-        const c = target.data;
-        const a00 = a[0], a01 = a[1], a02 = a[2];
-        const a10 = a[3], a11 = a[4], a12 = a[5];
-        const a20 = a[6], a21 = a[7], a22 = a[8];
-        const b00 = b[0], b01 = b[1], b02 = b[2];
-        const b10 = b[3], b11 = b[4], b12 = b[5];
-        const b20 = b[6], b21 = b[7], b22 = b[8];
-        c[0] = b00 * a00 + b01 * a10 + b02 * a20;
-        c[1] = b00 * a01 + b01 * a11 + b02 * a21;
-        c[2] = b00 * a02 + b01 * a12 + b02 * a22;
-        c[3] = b10 * a00 + b11 * a10 + b12 * a20;
-        c[4] = b10 * a01 + b11 * a11 + b12 * a21;
-        c[5] = b10 * a02 + b11 * a12 + b12 * a22;
-        c[6] = b20 * a00 + b21 * a10 + b22 * a20;
-        c[7] = b20 * a01 + b21 * a11 + b22 * a21;
-        c[8] = b20 * a02 + b21 * a12 + b22 * a22;
-        return target;
-    }
-    static multiplyVector(matrix, vector, target = new MutableVector3D()) {
-        const a = matrix.data;
-        const b = vector;
-        const c = target;
-        const x = b.x, y = b.y, z = b.z;
-        c.x = a[0] * x + a[4] * y + a[8] * z;
-        c.y = a[1] * x + a[5] * y + a[9] * z;
-        c.z = a[2] * x + a[6] * y + a[10] * z;
-        return target;
-    }
-    static createRotation(rotation, target = new Matrix3()) {
-        let matrix = target || new Matrix3();
-        matrix.multiply(Matrix3.createRotationY(rotation.yaw));
-        matrix.multiply(Matrix3.createRotationX(rotation.pitch));
-        matrix.multiply(Matrix3.createRotationZ(rotation.roll));
-        return matrix;
-    }
-    static createRotationX(angle, target = new Matrix3()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = 1;
-        target.data[1] = 0;
-        target.data[2] = 0;
-        target.data[4] = 0;
-        target.data[5] = cos;
-        target.data[6] = sin;
-        target.data[8] = 0;
-        target.data[9] = -sin;
-        target.data[10] = cos;
-        return target;
-    }
-    static createRotationY(angle, target = new Matrix3()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = cos;
-        target.data[1] = 0;
-        target.data[2] = -sin;
-        target.data[4] = 0;
-        target.data[5] = 1;
-        target.data[6] = 0;
-        target.data[8] = sin;
-        target.data[9] = 0;
-        target.data[10] = cos;
-        return target;
-    }
-    static createRotationZ(angle, target = new Matrix3()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = cos;
-        target.data[1] = sin;
-        target.data[2] = 0;
-        target.data[4] = -sin;
-        target.data[5] = cos;
-        target.data[6] = 0;
-        target.data[8] = 0;
-        target.data[9] = 0;
-        target.data[10] = 1;
-        return target;
-    }
-}
-
-class Rotation {
-    yaw;
-    pitch;
-    roll;
-    constructor(yaw = 0, pitch = 0, roll = 0) {
-        if (typeof yaw !== 'number')
-            throw new TypeError('yaw must be a number');
-        if (typeof pitch !== 'number')
-            throw new TypeError('pitch must be a number');
-        if (typeof roll !== 'number')
-            throw new TypeError('roll must be a number');
-        if (isNaN(yaw))
-            throw new TypeError('yaw must not be NaN');
-        if (isNaN(pitch))
-            throw new TypeError('pitch must not be NaN');
-        if (isNaN(roll))
-            throw new TypeError('roll must not be NaN');
-        this.yaw = yaw;
-        this.pitch = pitch;
-        this.roll = roll;
-    }
-    set(yaw, pitch, roll) {
-        if (typeof yaw == 'number' && typeof pitch === 'number' && typeof roll === 'number') {
-            this.yaw = yaw;
-            this.pitch = pitch;
-            this.roll = roll;
-        }
-        else if (yaw instanceof Rotation && pitch === undefined && roll === undefined) {
-            this.yaw = yaw.yaw;
-            this.pitch = yaw.pitch;
-            this.roll = yaw.roll;
-        }
-        else {
-            throw new Error('Invalid arguments to Rotation.set(), expected number, number, number or Rotation');
-        }
-    }
-    clone() {
-        return new Rotation(this.yaw, this.pitch, this.roll);
-    }
-}
-
-var Orientation;
-(function (Orientation) {
-    Orientation[Orientation["North"] = 0] = "North";
-    Orientation[Orientation["East"] = 1] = "East";
-    Orientation[Orientation["South"] = 2] = "South";
-    Orientation[Orientation["West"] = 3] = "West";
-    Orientation[Orientation["Up"] = 4] = "Up";
-    Orientation[Orientation["Down"] = 5] = "Down";
-})(Orientation || (Orientation = {}));
-(function (Orientation) {
-    const rotations = new Map();
-    function getRotation(orientation) {
-        if (!rotations.has(orientation)) {
-            rotations.set(orientation, calculateRotation(orientation));
-        }
-        return rotations.get(orientation);
-    }
-    Orientation.getRotation = getRotation;
-    function calculateRotation(orientation) {
-        switch (orientation) {
-            case Orientation.North: return new Rotation(0, 0, 0);
-            case Orientation.East: return new Rotation(0, 90, 0);
-            case Orientation.South: return new Rotation(0, 180, 0);
-            case Orientation.West: return new Rotation(0, 270, 0);
-            case Orientation.Up: return new Rotation(-90, 0, 0);
-            case Orientation.Down: return new Rotation(90, 0, 0);
-        }
-    }
-    const matrices = new Map();
-    function getMatrix(orientation) {
-        if (!matrices.has(orientation)) {
-            matrices.set(orientation, Matrix3.createRotation(getRotation(orientation)));
-        }
-        return matrices.get(orientation);
-    }
-    Orientation.getMatrix = getMatrix;
-})(Orientation || (Orientation = {}));
-
 class Vector2D {
     x;
     y;
@@ -771,210 +735,45 @@ class ImmutableVector2D extends Vector2D {
     }
 }
 
-class PositionedModelComponent {
-    position = new MutableVector3D();
-    getPosition() {
-        return this.position.clone();
-    }
-    setPosition(position) {
-        this.position.set(position);
-    }
-}
-
-class GroupModelComponent extends PositionedModelComponent {
-    components = new Set();
-    getVertexPositions(parentPosition) {
-        const components = Array.from(this.components);
-        const positions = components.map(component => component.getVertexPositions(parentPosition));
-        const buffer = DataUtils.concat(positions);
-        return new Float32Array(buffer);
-    }
-    getTextureMappings() {
-        const components = Array.from(this.components);
-        const textureMappings = components.map(component => component.getTextureMappings());
-        const buffer = DataUtils.concat(textureMappings);
-        return new Uint32Array(buffer);
-    }
-    getTextureIds() {
-        const components = Array.from(this.components);
-        const textureIds = components.map(component => component.getTextureIds());
-        const buffer = DataUtils.concat(textureIds);
-        return new Uint32Array(buffer);
-    }
-    add(...components) {
-        for (const component of components) {
-            this.components.add(component);
-        }
-    }
-    remove(...components) {
-        for (const component of components) {
-            this.components.delete(component);
-        }
-    }
-}
-
-class PlaneModelComponent extends PositionedModelComponent {
-    width;
-    height;
-    orientation = Orientation.North;
-    texture;
-    constructor(texture, size, orientation) {
-        super();
-        this.width = size.x;
-        this.height = size.y;
-        this.texture = texture;
-        this.orientation = orientation;
-    }
-    getVertexPositions() {
-        return PlaneModelComponent.makePlaneVertices(this.orientation, this.width, this.height);
-    }
-    getTextureMappings() {
-        const data = new Uint32Array(PlaneModelComponent.baseTextureMapping.length);
-        const width = this.texture.getTextureWidth();
-        const height = this.texture.getTextureHeight();
-        for (let i = 0; i < data.length / 2; i++) {
-            data[i * 2] = PlaneModelComponent.baseTextureMapping[i * 2] * width;
-            data[i * 2 + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] * height;
-        }
-        return data;
-    }
-    getTextureIds() {
-        const textureId = this.texture.getRegisteredId();
-        return new Uint32Array([
-            textureId,
-            textureId
-        ]);
-    }
-    static makePlaneVertices(orientation, width, height) {
-        const vertices = PlaneModelComponent.baseGeometry.map(x => x);
-        for (let i = 0; i < vertices.length / 3; i++) {
-            const vector = new ImmutableVector3D(vertices[i * 3] * width, vertices[i * 3 + 1] * height, vertices[i * 3 + 2]);
-            const matrix = Orientation.getMatrix(orientation);
-            const result = matrix.multiply(vector);
-            vertices[i * 3] = result.x;
-            vertices[i * 3 + 1] = result.y;
-            vertices[i * 3 + 2] = result.z;
-        }
-        return vertices;
-    }
-    static baseTextureMapping = new Uint8Array([
-        0, 0,
-        1, 0,
-        1, 1,
-        1, 0,
-        0, 1,
-        0, 0
-    ]);
-    static baseGeometry = PlaneModelComponent.getBaseGeometry();
-    static getBaseGeometry() {
-        const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
-        for (let i = 0; i < PlaneModelComponent.baseTextureMapping.length / 2; i++) {
-            data[i] = PlaneModelComponent.baseTextureMapping[i * 2] - 0.5;
-            data[i + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] - 0.5;
-        }
-        return data;
-    }
-}
-
-class BoxModelComponent extends GroupModelComponent {
-    constructor(dimensions, textures) {
-        super();
-        const north = new PlaneModelComponent(textures[0], new ImmutableVector2D(dimensions.x, dimensions.y), Orientation.North);
-        const south = new PlaneModelComponent(textures[1], new ImmutableVector2D(dimensions.x, dimensions.y), Orientation.South);
-        const east = new PlaneModelComponent(textures[2], new ImmutableVector2D(dimensions.z, dimensions.y), Orientation.East);
-        const west = new PlaneModelComponent(textures[3], new ImmutableVector2D(dimensions.z, dimensions.y), Orientation.West);
-        const up = new PlaneModelComponent(textures[4], new ImmutableVector2D(dimensions.x, dimensions.z), Orientation.Up);
-        const down = new PlaneModelComponent(textures[5], new ImmutableVector2D(dimensions.x, dimensions.z), Orientation.Down);
-        this.add(north, south, east, west, up, down);
-    }
-}
-
-class BlockPrototype extends IndexedRegistryItem {
-}
-
-class BaseBlockPrototype extends BlockPrototype {
-    instantiate(position) {
-        position.getChunkData().getField('blockId').set(position, this.getRegisteredId());
-    }
-    whenDestroyed(position) {
-        const empty = Registries.blocks.get('empty');
-        if (!empty) {
-            throw new Error("Empty block not found in registry");
-        }
-        position.getChunkData().setBlock(position, empty);
-    }
-    whenUsed(position) {
-    }
-    whenPlaced(position) {
-    }
-    whenTicked(position) {
-    }
-    isRendered() {
-        return true;
-    }
-    async setup() {
-    }
-}
-
-class StonePrototype extends BaseBlockPrototype {
-    whenPlaced(position) {
-        console.log("Stone placed at " + position.toString());
-    }
-    getBlockModel(position) {
-        return StonePrototype.model;
-    }
-    static model;
-    static texture;
-    static async setup() {
-        this.texture = await Texture.load("blocks.stone");
-        this.model = new BlockModel();
-        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), new Array(6).fill(this.texture));
-        this.model.add(box);
-    }
-    static getBlockModel() {
-        return StonePrototype.model;
-    }
-}
-
-class BaseEntityPrototype {
-    async setup() {
-    }
-}
-
-class HandleableVector3D extends MutableVector3D {
-    _listeners;
-    constructor(x = 0, y = 0, z = 0) {
-        super(x, y, z);
-        this._listeners = new Set();
-    }
-    on(type, handler) {
-        if (type == 'change') {
-            this._listeners.add(handler);
-        }
-        else {
-            throw new Error('Unknown event type');
-        }
-    }
-    cause(type) {
-        if (type == 'change') {
-            for (const listener of this._listeners) {
-                listener();
-            }
-        }
-        else {
-            throw new Error('Unknown event type');
-        }
+class ImmutableVector3D extends Vector3D {
+    constructor(x, y, z) {
+        if (x instanceof Vector3D)
+            super(x.x, x.y, x.z);
+        else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number')
+            super(x, y, z);
+        else
+            super(0, 0, 0);
     }
     _set(x, y, z) {
-        this.cause('change');
-        return super._set(x, y, z);
+        return new ImmutableVector3D(x, y, z);
     }
-    clone() {
-        throw new Error("Cannot clone handleable vector. Instead use immutable() or mutable() to output a non-handlable vector.");
+    set(x, y, z) {
+        throw new Error("Cannot set immutable vector");
     }
     static from(vector, format) {
         const values = [...Vector3D._from(vector, format)];
-        return new HandleableVector3D(values[0], values[1], values[2]);
+        return new ImmutableVector3D(values[0], values[1], values[2]);
+    }
+}
+
+class MutableVector3D extends Vector3D {
+    constructor(x, y, z) {
+        if (x instanceof Vector3D)
+            super(x.x, x.y, x.z);
+        else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number')
+            super(x, y, z);
+        else
+            super(0, 0, 0);
+    }
+    _set(x, y, z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        return this;
+    }
+    static from(vector, format) {
+        const values = [...Vector3D._from(vector, format)];
+        return new MutableVector3D(values[0], values[1], values[2]);
     }
 }
 
@@ -998,11 +797,7 @@ var ChunkDataReferencer;
     /**
      * The dimensions of the chunk as a 3D vector.
      */
-    ChunkDataReferencer.dimensions = new ImmutableVector3D(16, 32, 16);
-    const shiftY = 8;
-    const shiftZ = 4;
-    const xBlock = 0b1111;
-    const zBlock = 0b1111;
+    ChunkDataReferencer.dimensions = new ImmutableVector3D(16, 64, 16);
     /**
      * Returns the total number of cells in a chunk.
      */
@@ -1019,7 +814,7 @@ var ChunkDataReferencer;
         }
         if (x < 0 || x >= this.dimensions.x || y < 0 || y >= this.dimensions.y || z < 0 || z >= this.dimensions.z)
             throw new Error(`Coordinates are out of bounds`);
-        return x + (z << this.shiftZ) + (y << this.shiftY);
+        return x + (z << 4) + (y << 8);
     }
     ChunkDataReferencer.index = index;
     /**
@@ -1029,7 +824,7 @@ var ChunkDataReferencer;
      * without creating a vector.
      */
     function x(index) {
-        return index & xBlock;
+        return index & 0b1111;
     }
     ChunkDataReferencer.x = x;
     /**
@@ -1039,7 +834,7 @@ var ChunkDataReferencer;
      * without creating a vector.
      */
     function y(index) {
-        return index >> shiftY;
+        return index >> 8;
     }
     ChunkDataReferencer.y = y;
     /**
@@ -1049,7 +844,7 @@ var ChunkDataReferencer;
      * without creating a vector.
      */
     function z(index) {
-        return index >> shiftZ & zBlock;
+        return (index >> 4) & 0b1111;
     }
     ChunkDataReferencer.z = z;
     /**
@@ -1064,139 +859,29 @@ var ChunkDataReferencer;
         return new MutableVector3D(this.x(index), this.y(index), this.z(index));
     }
     ChunkDataReferencer.position = position;
+    function isOutOfBounds(position) {
+        return position.x < 0 || position.x >= this.dimensions.x || position.y < 0 || position.y >= this.dimensions.y || position.z < 0 || position.z >= this.dimensions.z;
+    }
+    ChunkDataReferencer.isOutOfBounds = isOutOfBounds;
 })(ChunkDataReferencer || (ChunkDataReferencer = {}));
 window['cdr'] = ChunkDataReferencer;
 
-class BaseEntity {
-    id;
-    chunk;
-    world;
-    position = new HandleableVector3D();
-    rotation = new Rotation();
-    constructor() {
-        this.position.on('change', () => {
-            // If the entity is not in a world or chunk, it doesn't need to update it's chunk
-            if (this.world && this.chunk) {
-                // Compute the location of the chunk the entity should be moved to.
-                const targetChunkX = Math.floor(this.position.x / ChunkDataReferencer.dimensions.x);
-                const targetChunkZ = Math.floor(this.position.z / ChunkDataReferencer.dimensions.z);
-                // Get the location of the chunk object that currently contains the entity.
-                const currentChunkPosition = this.chunk.getPosition();
-                const currentChunkX = currentChunkPosition.x;
-                const currentChunkZ = currentChunkPosition.y;
-                // Check if the entity should move to a different chunk.
-                if (currentChunkX != targetChunkX || currentChunkZ != targetChunkZ) {
-                    // Get the chunk that the entity should be in.
-                    let chunk = this.world.getChunk(targetChunkX, targetChunkZ);
-                    if (!chunk) {
-                        chunk = this.world.loadChunk(targetChunkX, targetChunkZ);
-                    }
-                    // Update the chunk the entity is in.
-                    this.setParentChunk(chunk);
-                }
-            }
-        });
-        this.id = BaseEntity.generateUniqueId();
+class IndexedRegistryItem {
+    registeredId;
+    registeredName;
+    bindRegistryKeys(id, name) {
+        this.registeredId = id;
+        this.registeredName = name;
     }
-    setWorld(world) {
-        if (world == null) {
-            this.world = null;
-            this.chunk = null;
-            return;
-        }
-        // Set the entity's properties to be in the world.
-        this.world = world;
-        this.chunk = null;
-        // Compute the location of the chunk the entity should be placed in.
-        const targetChunkX = Math.floor(this.position.x / ChunkDataReferencer.dimensions.x);
-        const targetChunkZ = Math.floor(this.position.z / ChunkDataReferencer.dimensions.z);
-        // Get the chunk object that the entity should be placed in.
-        let targetChunk = this.world.getChunk(targetChunkX, targetChunkZ);
-        // If the chunk object doesn't exist and the entity can load new chunks, load the chunk.
-        if (!targetChunk && this.canLoadChunks()) {
-            this.world.loadChunk(targetChunkX, targetChunkZ);
-            targetChunk = this.world.getChunk(targetChunkX, targetChunkZ);
-        }
-        // Update the chunk the entity is in.
-        this.setParentChunk(targetChunk);
+    getRegisteredId() {
+        return this.registeredId;
     }
-    getWorld() {
-        return this.world;
-    }
-    setParentChunk(chunk) {
-        if (this.chunk && !this.chunk.isPlaceholder())
-            this.chunk.getChunkData().removeEntity(this);
-        this.chunk = chunk;
-        if (this.chunk && !this.chunk.isPlaceholder())
-            this.chunk.getChunkData().addEntity(this);
-    }
-    getParentChunk() {
-        return this.chunk;
-    }
-    tickEntity(delta) {
-    }
-    getPosition() {
-        return this.position;
-    }
-    setPosition(x, y, z) {
-        if (x instanceof Vector3D) {
-            this.position.set(x.x, x.y, x.z);
-        }
-        else if (typeof y == 'number' && typeof z == 'number') {
-            this.position.set(x, y, z);
-        }
-        else {
-            throw new Error("Invalid arguments to BaseEntity.setPosition()");
-        }
-    }
-    getRotation() {
-        return this.rotation;
-    }
-    setRotation(rotation) {
-        this.rotation = rotation;
-    }
-    getUniqueId() {
-        return this.id;
-    }
-    getEntityModel() {
-        return null;
-    }
-    getPhysicalEntity() {
-        return null;
-    }
-    whenJoinWorld() {
-    }
-    getPhysicalState() {
-        return null;
-    }
-    getPhysicalProperties() {
-        return null;
-    }
-    static generateUniqueId() {
-        return crypto.randomUUID();
+    getRegisteredName() {
+        return this.registeredName;
     }
 }
 
-class PlayerEntity extends BaseEntity {
-    getPrototype() {
-        return Registries.entities.get('player');
-    }
-    canLoadChunks() {
-        return true;
-    }
-}
-
-class PlayerPrototype extends BaseEntityPrototype {
-    createEntity() {
-        return new PlayerEntity();
-    }
-}
-
-async function loadGameContent() {
-    Registries.entities.register('player', new PlayerPrototype());
-    await StonePrototype.setup();
-    Registries.blocks.register('stone', new StonePrototype());
-    Registries.blockModels.register('stone', StonePrototype.getBlockModel());
+class BlockPrototype extends IndexedRegistryItem {
 }
 
 /**
@@ -1220,12 +905,12 @@ var ChunkDataFields;
 })(ChunkDataFields || (ChunkDataFields = {}));
 
 class ChunkData {
-    chunk = null;
     fields;
+    chunk = null;
     entities = new Set();
     updates = new Set();
-    constructor() {
-        this.fields = ChunkDataFields.initialize();
+    constructor(fields = ChunkDataFields.initialize()) {
+        this.fields = fields;
     }
     setParentChunk(chunk) {
         this.chunk = chunk;
@@ -1250,7 +935,7 @@ class ChunkData {
     }
     getBlockId(x, y, z) {
         if (x instanceof BlockPosition) {
-            return this.getField('blockId').get(x.getGlobalPosition());
+            return this.getField('blockId').get(x.getLocalPosition());
         }
         else if (x instanceof Vector3D) {
             return this.getField('blockId').get(x);
@@ -1323,7 +1008,7 @@ class ChunkData {
     getBlockUpdates() {
         return this.updates;
     }
-    tickChunkData() {
+    async tickChunkData() {
         for (const update of this.updates) {
             const position = ChunkDataReferencer.position(update);
             const blockPrototype = this.getBlock(position);
@@ -1336,7 +1021,7 @@ class ChunkData {
 class ChunkInterface {
     unloadChunk() { }
     setupChunk() { }
-    tickChunk() { }
+    async tickChunk() { }
 }
 (function (ChunkInterface) {
     class NonPlaceholder extends ChunkInterface {
@@ -1387,8 +1072,8 @@ class Chunk extends ChunkInterface.NonPlaceholder {
             throw new Error("Cannot setup unbound chunk");
         this.chunkData = new ChunkData();
     }
-    tickChunk() {
-        this.chunkData.tickChunkData();
+    async tickChunk() {
+        await this.chunkData.tickChunkData();
     }
 }
 
@@ -1415,7 +1100,7 @@ class PlaceholderChunk extends ChunkInterface.Placeholder {
     }
     unloadChunk() { }
     setupChunk() { }
-    tickChunk() { }
+    async tickChunk() { }
 }
 
 class World {
@@ -1473,12 +1158,12 @@ class World {
             }
         }
     }
-    tick(delta) {
+    async tick(delta) {
         for (const entity of this.entityIdMapping.values()) {
-            entity.tickEntity(delta);
+            await entity.tickEntity(delta);
         }
         for (const [_id, chunk] of this.chunks) {
-            chunk.tickChunk();
+            await chunk.tickChunk();
         }
         this._validateDisconnectedEntities();
     }
@@ -1495,8 +1180,9 @@ class World {
         else {
             position = new ImmutableVector2D(x.x, x.y);
         }
-        if (this.getChunk(position)) {
-            throw new Error("Cannot load chunk where another chunk already exists");
+        let presentChunk = this.getChunk(position);
+        if (presentChunk) {
+            return presentChunk;
         }
         if (!this.loader) {
             throw new Error("Cannot load chunk: World has no loader");
@@ -1762,38 +1448,1086 @@ class ChunkDataNumberAllocation {
     }
 }
 
+var NoiseUtils;
+(function (NoiseUtils) {
+    function square(value, exponent) {
+        return Math.sign(value) * (1 - (1 - Math.abs(value)) ** exponent);
+    }
+    NoiseUtils.square = square;
+    function scaledNoise2D(noise, scale) {
+        return (x, y) => noise(x / scale, y / scale);
+    }
+    NoiseUtils.scaledNoise2D = scaledNoise2D;
+    function scaledNoise3D(noise, scale) {
+        return (x, y, z) => noise(x / scale, y / scale, z / scale);
+    }
+    NoiseUtils.scaledNoise3D = scaledNoise3D;
+    function octavedNoise2D(count) {
+        let noises = [];
+        for (let i = 0; i < count; i++) {
+            noises.push(createNoise2D());
+        }
+        return (x, y) => {
+            let value = 0;
+            let denomenator = 0;
+            for (let i = 0; i < count; i++) {
+                value += noises[i](x * i, y * i) / (i + 1);
+                denomenator += 1 / (i + 1);
+            }
+            return value / denomenator;
+        };
+    }
+    NoiseUtils.octavedNoise2D = octavedNoise2D;
+    function octavedNoise3D(count) {
+        let noises = [];
+        for (let i = 0; i < count; i++) {
+            noises.push(createNoise3D());
+        }
+        return (x, y, z) => {
+            let value = 0;
+            let denomenator = 0;
+            for (let i = 0; i < count; i++) {
+                value += noises[i](x * i, y * i, z * i) / (i + 1);
+                denomenator += 1 / (i + 1);
+            }
+            return value / denomenator;
+        };
+    }
+    NoiseUtils.octavedNoise3D = octavedNoise3D;
+})(NoiseUtils || (NoiseUtils = {}));
+
+class SimpleWorldGenerator {
+    surface2DNoise;
+    surface3DNoise;
+    caveNoises;
+    constructor() {
+        this.surface2DNoise = NoiseUtils.scaledNoise2D(NoiseUtils.octavedNoise2D(4), 64);
+        this.surface3DNoise = NoiseUtils.scaledNoise3D(createNoise3D(), 32);
+        this.caveNoises = [createNoise3D(), createNoise3D(), createNoise3D()];
+    }
+    async createDensities(location, data) {
+        for (let x = 0; x < ChunkDataReferencer.dimensions.x; x++) {
+            for (let z = 0; z < ChunkDataReferencer.dimensions.z; z++) {
+                let surface2d = (this.surface2DNoise(x + location.x * ChunkDataReferencer.dimensions.x, z + location.y * ChunkDataReferencer.dimensions.z) / 2 + 0.5) / 2 + 0.5;
+                for (let y = 0; y < ChunkDataReferencer.dimensions.y; y++) {
+                    let yFraction = y / ChunkDataReferencer.dimensions.y;
+                    let surface3d = this.surface3DNoise(x + location.x * ChunkDataReferencer.dimensions.x, y, z + location.y * ChunkDataReferencer.dimensions.z);
+                    let surface = (surface2d - yFraction) + surface3d / 2;
+                    data.getField('surface').set(x, y, z, surface);
+                    let cave = 0;
+                    for (let noise of this.caveNoises) {
+                        cave += Math.abs(noise((x + location.x * ChunkDataReferencer.dimensions.x) / 32, y / 32, (z + location.y * ChunkDataReferencer.dimensions.z) / 32));
+                    }
+                    cave /= this.caveNoises.length;
+                    cave = 2 * Math.pow((cave + 1) / 2, 2) - 1;
+                    data.getField('cave').set(x, y, z, cave);
+                }
+            }
+        }
+    }
+    async generateChunk(location) {
+        const data = new ChunkData();
+        const densities = new ChunkData(new Map([
+            ['surface', new ChunkDataNumberAllocation('f32').instantiate()],
+            ['cave', new ChunkDataNumberAllocation('f32').instantiate()]
+        ]));
+        const surfaceDensity = densities.getField('surface');
+        densities.getField('cave');
+        await this.createDensities(location, densities);
+        const stone = Registries.blocks.get('stone');
+        const air = Registries.blocks.get('air');
+        const dirt = Registries.blocks.get('dirt');
+        if (!(stone && air && dirt)) {
+            throw new Error("Failed to blocks for simple world generator");
+        }
+        for (let x = 0; x < ChunkDataReferencer.dimensions.x; x++) {
+            for (let z = 0; z < ChunkDataReferencer.dimensions.z; z++) {
+                for (let y = 0; y < ChunkDataReferencer.dimensions.y; y++) {
+                    if (surfaceDensity.get(x, y, z) > 0) {
+                        data.setBlock(x, y, z, stone);
+                    }
+                    else {
+                        data.setBlock(x, y, z, air);
+                    }
+                }
+            }
+        }
+        return data;
+    }
+}
+
+class EventClockViewer {
+    clock;
+    enabled = false;
+    element;
+    constructor(clock) {
+        this.clock = clock;
+        document.addEventListener('keypress', event => {
+            if (event.code == 'KeyT' && event.altKey) {
+                this.enabled = !this.enabled;
+                if (this.enabled) {
+                    document.body.appendChild(this.element);
+                }
+                else {
+                    document.body.removeChild(this.element);
+                }
+            }
+        });
+        this.element = document.createElement('div');
+        this.element.style.position = "fixed";
+        this.element.style.top = "5px";
+        this.element.style.left = "5px";
+        this.element.style.color = "white";
+        this.element.style.fontFamily = "monospace";
+        this.element.style.background = "#00000088";
+        this.element.style.padding = "5px";
+        this.element.style.borderRadius = "5px";
+    }
+    update() {
+        if (!this.enabled)
+            return;
+        const taskInfo = this.clock.getTaskInfo();
+        if (taskInfo == null)
+            return;
+        let text = [];
+        for (const task of taskInfo.tasks) {
+            text.push(`${task.name} - ${task.time}ms`);
+        }
+        this.element.innerText = text.join('\n');
+    }
+}
+
+var GameRuntimeType;
+(function (GameRuntimeType) {
+    GameRuntimeType[GameRuntimeType["Singleplayer"] = 0] = "Singleplayer";
+    GameRuntimeType[GameRuntimeType["MultiplayerClient"] = 1] = "MultiplayerClient";
+    GameRuntimeType[GameRuntimeType["MultiplayerServer"] = 2] = "MultiplayerServer";
+})(GameRuntimeType || (GameRuntimeType = {}));
+
+class BaseBlockPrototype extends BlockPrototype {
+    instantiate(position) {
+        position.getChunkData().getField('blockId').set(position, this.getRegisteredId());
+    }
+    whenDestroyed(position) {
+        const empty = Registries.blocks.get('empty');
+        if (!empty) {
+            throw new Error("Empty block not found in registry");
+        }
+        position.getChunkData().setBlock(position, empty);
+    }
+    whenUsed(position) {
+    }
+    whenPlaced(position) {
+    }
+    whenTicked(position) {
+    }
+    isRendered() {
+        return true;
+    }
+    async setup() {
+    }
+}
+
+class AirPrototype extends BaseBlockPrototype {
+    whenPlaced(position) {
+        console.log("Air placed at " + position.toString());
+    }
+    getBlockModel(position) {
+        return null;
+    }
+}
+
+class Texture extends IndexedRegistryItem {
+    data;
+    width;
+    height;
+    constructor(data, width, height) {
+        super();
+        this.data = data;
+        this.width = width;
+        this.height = height;
+    }
+    getTextureWidth() {
+        return this.width;
+    }
+    getTextureHeight() {
+        return this.height;
+    }
+    toDataArray() {
+        return this.data;
+    }
+    toImageData() {
+        return new ImageData(this.data, this.width, this.height);
+    }
+    static fromImage(source) {
+        const canvas = new OffscreenCanvas(source.width, source.height);
+        const context = canvas.getContext('2d');
+        context.drawImage(source, 0, 0);
+        const imageData = context.getImageData(0, 0, source.width, source.height);
+        return Texture.fromImageData(imageData);
+    }
+    static fromImageData(imageData) {
+        return new Texture(imageData.data, imageData.width, imageData.height);
+    }
+    static fromDataArray(data, width, height) {
+        return new Texture(data, width, height);
+    }
+    static load(name) {
+        const url = '/assets/textures/' + name.replace(/\./g, '/') + '.png';
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => {
+                const texture = Texture.fromImage(image);
+                Registries.textures.register(name, texture);
+                resolve(texture);
+            };
+            image.onerror = () => {
+                reject(new Error(`Failed to load image from ${url}`));
+            };
+            image.src = url;
+        });
+    }
+}
+
+var DataUtils;
+(function (DataUtils) {
+    function concat(buffers) {
+        const totalLength = buffers.reduce((total, buffer) => total + buffer.byteLength, 0);
+        const result = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const buffer of buffers) {
+            result.set(new Uint8Array(buffer.buffer), offset);
+            offset += buffer.byteLength;
+        }
+        return result.buffer;
+    }
+    DataUtils.concat = concat;
+})(DataUtils || (DataUtils = {}));
+
+class BlockModel extends IndexedRegistryItem {
+    components = new Set();
+    transparent = false;
+    constructor(options) {
+        super();
+        this.transparent = options?.transparent ?? false;
+    }
+    isTransparent() {
+        return this.transparent;
+    }
+    getVertexPositions() {
+        const components = Array.from(this.components);
+        const positions = components.map(component => component.getVertexPositions(new ImmutableVector3D()));
+        const buffer = DataUtils.concat(positions);
+        return new Float32Array(buffer);
+    }
+    getTextureMappings() {
+        const components = Array.from(this.components);
+        const textureMappings = components.map(component => component.getTextureMappings());
+        const buffer = DataUtils.concat(textureMappings);
+        return new Float32Array(buffer);
+    }
+    getTextureIds() {
+        const components = Array.from(this.components);
+        const textureIds = components.map(component => component.getTextureIds());
+        const buffer = DataUtils.concat(textureIds);
+        return new Uint32Array(buffer);
+    }
+    add(...components) {
+        for (const component of components) {
+            this.components.add(component);
+        }
+    }
+    remove(...components) {
+        for (const component of components) {
+            this.components.delete(component);
+        }
+    }
+}
+
+class Matrix3 {
+    data;
+    constructor(data = [1, 0, 0, 0, 1, 0, 0, 0, 1]) {
+        this.data = data;
+    }
+    multiply(value) {
+        if (value instanceof Vector3D) {
+            return Matrix3.multiplyVector(this, value);
+        }
+        else if (value instanceof Matrix3) {
+            return Matrix3.multiply(this, value, this);
+        }
+        else {
+            throw new Error("Invalid arguments");
+        }
+    }
+    static multiply(matrix1, matrix2, target = new Matrix3()) {
+        const a = matrix1.data;
+        const b = matrix2.data;
+        const c = target.data;
+        const a00 = a[0], a01 = a[1], a02 = a[2];
+        const a10 = a[3], a11 = a[4], a12 = a[5];
+        const a20 = a[6], a21 = a[7], a22 = a[8];
+        const b00 = b[0], b01 = b[1], b02 = b[2];
+        const b10 = b[3], b11 = b[4], b12 = b[5];
+        const b20 = b[6], b21 = b[7], b22 = b[8];
+        c[0] = b00 * a00 + b01 * a10 + b02 * a20;
+        c[1] = b00 * a01 + b01 * a11 + b02 * a21;
+        c[2] = b00 * a02 + b01 * a12 + b02 * a22;
+        c[3] = b10 * a00 + b11 * a10 + b12 * a20;
+        c[4] = b10 * a01 + b11 * a11 + b12 * a21;
+        c[5] = b10 * a02 + b11 * a12 + b12 * a22;
+        c[6] = b20 * a00 + b21 * a10 + b22 * a20;
+        c[7] = b20 * a01 + b21 * a11 + b22 * a21;
+        c[8] = b20 * a02 + b21 * a12 + b22 * a22;
+        return target;
+    }
+    static multiplyVector(matrix, vector, target = new MutableVector3D()) {
+        const a = matrix.data;
+        const b = vector;
+        const c = target;
+        const x = b.x, y = b.y, z = b.z;
+        c.x = a[0] * x + a[3] * y + a[6] * z;
+        c.y = a[1] * x + a[4] * y + a[7] * z;
+        c.z = a[2] * x + a[5] * y + a[8] * z;
+        return target;
+    }
+    static createRotation(rotation, target = new Matrix3()) {
+        let matrix = target || new Matrix3();
+        matrix.multiply(Matrix3.createRotationY(rotation.yaw));
+        matrix.multiply(Matrix3.createRotationX(rotation.pitch));
+        matrix.multiply(Matrix3.createRotationZ(rotation.roll));
+        return matrix;
+    }
+    static createRotationX(angle, target = new Matrix3()) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        target.data[0] = 1;
+        target.data[1] = 0;
+        target.data[2] = 0;
+        target.data[4] = 0;
+        target.data[5] = cos;
+        target.data[6] = sin;
+        target.data[8] = 0;
+        target.data[9] = -sin;
+        target.data[10] = cos;
+        return target;
+    }
+    static createRotationY(angle, target = new Matrix3()) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        target.data[0] = cos;
+        target.data[1] = 0;
+        target.data[2] = -sin;
+        target.data[4] = 0;
+        target.data[5] = 1;
+        target.data[6] = 0;
+        target.data[8] = sin;
+        target.data[9] = 0;
+        target.data[10] = cos;
+        return target;
+    }
+    static createRotationZ(angle, target = new Matrix3()) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        target.data[0] = cos;
+        target.data[1] = sin;
+        target.data[2] = 0;
+        target.data[4] = -sin;
+        target.data[5] = cos;
+        target.data[6] = 0;
+        target.data[8] = 0;
+        target.data[9] = 0;
+        target.data[10] = 1;
+        return target;
+    }
+}
+
+class Rotation {
+    yaw;
+    pitch;
+    roll;
+    constructor(yaw = 0, pitch = 0, roll = 0) {
+        if (typeof yaw !== 'number')
+            throw new TypeError('yaw must be a number');
+        if (typeof pitch !== 'number')
+            throw new TypeError('pitch must be a number');
+        if (typeof roll !== 'number')
+            throw new TypeError('roll must be a number');
+        if (isNaN(yaw))
+            throw new TypeError('yaw must not be NaN');
+        if (isNaN(pitch))
+            throw new TypeError('pitch must not be NaN');
+        if (isNaN(roll))
+            throw new TypeError('roll must not be NaN');
+        this.yaw = yaw;
+        this.pitch = pitch;
+        this.roll = roll;
+    }
+    set(yaw, pitch, roll) {
+        if (typeof yaw == 'number' && typeof pitch === 'number' && typeof roll === 'number') {
+            this.yaw = yaw;
+            this.pitch = pitch;
+            this.roll = roll;
+        }
+        else if (yaw instanceof Rotation && pitch === undefined && roll === undefined) {
+            this.yaw = yaw.yaw;
+            this.pitch = yaw.pitch;
+            this.roll = yaw.roll;
+        }
+        else {
+            throw new Error('Invalid arguments to Rotation.set(), expected number, number, number or Rotation');
+        }
+    }
+    clone() {
+        return new Rotation(this.yaw, this.pitch, this.roll);
+    }
+    static fromDegrees(yaw, pitch, roll) {
+        return new Rotation(Math.PI / 180 * yaw, Math.PI / 180 * pitch, Math.PI / 180 * roll);
+    }
+}
+
+var Orientation;
+(function (Orientation) {
+    Orientation[Orientation["North"] = 0] = "North";
+    Orientation[Orientation["East"] = 1] = "East";
+    Orientation[Orientation["South"] = 2] = "South";
+    Orientation[Orientation["West"] = 3] = "West";
+    Orientation[Orientation["Up"] = 4] = "Up";
+    Orientation[Orientation["Down"] = 5] = "Down";
+})(Orientation || (Orientation = {}));
+(function (Orientation) {
+    const rotations = new Map();
+    function getRotation(orientation) {
+        if (!rotations.has(orientation)) {
+            rotations.set(orientation, calculateRotation(orientation));
+        }
+        return rotations.get(orientation);
+    }
+    Orientation.getRotation = getRotation;
+    function calculateRotation(orientation) {
+        switch (orientation) {
+            case Orientation.North: return Rotation.fromDegrees(0, 0, 0);
+            case Orientation.East: return Rotation.fromDegrees(0, 90, 0);
+            case Orientation.South: return Rotation.fromDegrees(0, 180, 0);
+            case Orientation.West: return Rotation.fromDegrees(0, 270, 0);
+            case Orientation.Up: return Rotation.fromDegrees(-90, 0, 0);
+            case Orientation.Down: return Rotation.fromDegrees(90, 0, 0);
+        }
+    }
+    const matrices = new Map();
+    function getMatrix(orientation) {
+        if (!matrices.has(orientation)) {
+            matrices.set(orientation, Matrix3.createRotation(getRotation(orientation)));
+        }
+        return matrices.get(orientation);
+    }
+    Orientation.getMatrix = getMatrix;
+})(Orientation || (Orientation = {}));
+
+class PositionedModelComponent {
+    position = new MutableVector3D();
+    getPosition() {
+        return this.position.clone();
+    }
+    setPosition(position) {
+        this.position.set(position);
+    }
+}
+
+class GroupModelComponent extends PositionedModelComponent {
+    components = new Set();
+    getVertexPositions(parentPosition) {
+        const components = Array.from(this.components);
+        const positions = components.map(component => component.getVertexPositions(parentPosition));
+        const buffer = DataUtils.concat(positions);
+        const array = new Float32Array(buffer);
+        return array;
+    }
+    getTextureMappings() {
+        const components = Array.from(this.components);
+        const textureMappings = components.map(component => component.getTextureMappings());
+        const buffer = DataUtils.concat(textureMappings);
+        return new Float32Array(buffer);
+    }
+    getTextureIds() {
+        const components = Array.from(this.components);
+        const textureIds = components.map(component => component.getTextureIds());
+        const buffer = DataUtils.concat(textureIds);
+        return new Uint32Array(buffer);
+    }
+    add(...components) {
+        for (const component of components) {
+            this.components.add(component);
+        }
+    }
+    remove(...components) {
+        for (const component of components) {
+            this.components.delete(component);
+        }
+    }
+}
+
+class PlaneModelComponent extends PositionedModelComponent {
+    width;
+    height;
+    orientation = Orientation.North;
+    texture;
+    constructor(texture, size, orientation) {
+        super();
+        this.width = size.x;
+        this.height = size.y;
+        this.texture = texture;
+        this.orientation = orientation;
+    }
+    getVertexPositions() {
+        return PlaneModelComponent.makePlaneVertices(this.orientation, this.width, this.height, this.getPosition());
+    }
+    getTextureMappings() {
+        const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
+        const width = this.texture.getTextureWidth();
+        const height = this.texture.getTextureHeight();
+        for (let i = 0; i < data.length / 2; i++) {
+            data[i * 2] = PlaneModelComponent.baseTextureMapping[i * 2] * width;
+            data[i * 2 + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] * height;
+        }
+        return data;
+    }
+    getTextureIds() {
+        const textureId = this.texture.getRegisteredId();
+        return new Uint32Array([
+            textureId,
+            textureId
+        ]);
+    }
+    static orientPlaneVertex(orientation, x, y) {
+        if (orientation == Orientation.Up || orientation == Orientation.Down) {
+            return new ImmutableVector3D(x, 0, y);
+        }
+        else if (orientation == Orientation.North || orientation == Orientation.South) {
+            return new ImmutableVector3D(x, y, 0);
+        }
+        else if (orientation == Orientation.East || orientation == Orientation.West) {
+            return new ImmutableVector3D(0, x, y);
+        }
+        else {
+            throw new Error("Invalid orientation");
+        }
+    }
+    static makePlaneVertices(orientation, width, height, position) {
+        const source = PlaneModelComponent.baseGeometry.map(x => x);
+        const vertices = new Float32Array(source.length / 2 * 3);
+        for (let i = 0; i < source.length / 2; i++) {
+            const vertex = PlaneModelComponent.orientPlaneVertex(orientation, source[i * 2] * width, source[i * 2 + 1] * height);
+            vertices[i * 3] = vertex.x + position.x;
+            vertices[i * 3 + 1] = vertex.y + position.y;
+            vertices[i * 3 + 2] = vertex.z + position.z;
+        }
+        return vertices;
+    }
+    static baseTextureMapping = new Uint8Array([
+        1, 1,
+        1, 0,
+        0, 0,
+        1, 1,
+        0, 0,
+        0, 1
+    ]);
+    static baseGeometry = PlaneModelComponent.getBasePlaneGeometry();
+    static getBasePlaneGeometry() {
+        const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
+        for (let i = 0; i < PlaneModelComponent.baseTextureMapping.length / 2; i++) {
+            data[i * 2] = PlaneModelComponent.baseTextureMapping[i * 2] - 0.5;
+            data[i * 2 + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] - 0.5;
+        }
+        return data;
+    }
+}
+
+class BoxModelComponent extends GroupModelComponent {
+    constructor(dimensions, textures) {
+        super();
+        const north = new PlaneModelComponent(textures[0], new ImmutableVector2D(dimensions.x, dimensions.y), Orientation.North);
+        north.setPosition(new ImmutableVector3D(0.5, 0.5, 0));
+        const east = new PlaneModelComponent(textures[1], new ImmutableVector2D(dimensions.z, dimensions.y), Orientation.East);
+        east.setPosition(new ImmutableVector3D(1, 0.5, 0.5));
+        const south = new PlaneModelComponent(textures[2], new ImmutableVector2D(dimensions.x, dimensions.y), Orientation.South);
+        south.setPosition(new ImmutableVector3D(0.5, 0.5, 1));
+        const west = new PlaneModelComponent(textures[3], new ImmutableVector2D(dimensions.z, dimensions.y), Orientation.West);
+        west.setPosition(new ImmutableVector3D(0, 0.5, 0.5));
+        const up = new PlaneModelComponent(textures[4], new ImmutableVector2D(dimensions.x, dimensions.z), Orientation.Up);
+        up.setPosition(new ImmutableVector3D(0.5, 1, 0.5));
+        const down = new PlaneModelComponent(textures[5], new ImmutableVector2D(dimensions.x, dimensions.z), Orientation.Down);
+        down.setPosition(new ImmutableVector3D(0.5, 0, 0.5));
+        this.add(north, east, south, west, up, down);
+    }
+}
+
+class DirtPrototype extends BaseBlockPrototype {
+    whenPlaced(position) {
+        console.log("Dirt placed at " + position.toString());
+    }
+    getBlockModel(position) {
+        return DirtPrototype.model;
+    }
+    static model;
+    static texture;
+    static async setup() {
+        this.texture = await Texture.load("blocks.dirt");
+        this.model = new BlockModel();
+        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), new Array(6).fill(this.texture));
+        this.model.add(box);
+    }
+    static getBlockModel() {
+        return DirtPrototype.model;
+    }
+}
+
+class StonePrototype extends BaseBlockPrototype {
+    whenPlaced(position) {
+        console.log("Stone placed at " + position.toString());
+    }
+    getBlockModel(position) {
+        return StonePrototype.model;
+    }
+    static model;
+    static texture;
+    static async setup() {
+        this.texture = await Texture.load("blocks.stone");
+        this.model = new BlockModel();
+        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), new Array(6).fill(this.texture));
+        this.model.add(box);
+    }
+    static getBlockModel() {
+        return StonePrototype.model;
+    }
+}
+
+class BaseEntityPrototype {
+    async setup() {
+    }
+}
+
+var EntityPhysics;
+(function (EntityPhysics) {
+    function applyGravity(entity, delta) {
+        const state = entity.getPhysicalState();
+        const properties = entity.getPhysicalProperties();
+        state.applyForce(new ImmutableVector3D(0, properties.gravity * delta, 0));
+    }
+    function isOnGround(entity) {
+        return false;
+    }
+    EntityPhysics.isOnGround = isOnGround;
+    function applyFriction(entity, delta) {
+        const state = entity.getPhysicalState();
+        const properties = entity.getPhysicalProperties();
+        {
+            state.applyFriction(new ImmutableVector3D(properties.friction.air, properties.friction.air, properties.friction.air));
+        }
+    }
+    function applyVelocity(entity, delta) {
+        const state = entity.getPhysicalState();
+        const position = entity.getPosition();
+        const velocity = state.getVelocity();
+        position.x += velocity.x * delta;
+        position.y += velocity.y * delta;
+        position.z += velocity.z * delta;
+        entity.setPosition(position);
+    }
+    function simulateEntity(entity, delta) {
+        if (!entity.getPhysicalState() || !entity.getPhysicalProperties()) {
+            return;
+        }
+        applyGravity(entity, delta);
+        applyFriction(entity);
+        applyVelocity(entity, delta);
+    }
+    EntityPhysics.simulateEntity = simulateEntity;
+})(EntityPhysics || (EntityPhysics = {}));
+
+class PhysicalEntityState {
+    velocity = new MutableVector3D();
+    getVelocity() {
+        return this.velocity.clone();
+    }
+    setVelocity(velocity) {
+        this.velocity.set(velocity);
+    }
+    applyForce(force) {
+        this.velocity.add(force);
+    }
+    applyFriction(friction) {
+        this.velocity.scalarMultiply(friction);
+    }
+}
+
+class PhysicalComponent {
+    parent = null;
+    getParent() {
+        return this.parent;
+    }
+    setParent(parent) {
+        this.parent = parent;
+        this.parent?.updateHitboxes();
+    }
+    getIntersection(rayWalker) {
+        let distance = Infinity;
+        for (let hitbox of this.getHitboxes()) {
+            let intersection = hitbox.getIntersection(rayWalker);
+            if (intersection !== null) {
+                distance = Math.min(distance, intersection);
+            }
+        }
+        return isFinite(distance) ? distance : null;
+    }
+}
+
+class BoxPhysicalComponent extends PhysicalComponent {
+    hitbox;
+    constructor(hitbox) {
+        super();
+        this.hitbox = hitbox;
+    }
+    updateHitboxes() {
+    }
+    *getHitboxes() {
+        yield this.hitbox;
+    }
+}
+
+class PhysicalHitbox {
+    position;
+    size;
+    constructor(position, size) {
+        this.position = new MutableVector3D(position);
+        this.size = new MutableVector3D(size);
+    }
+    getPosition() {
+        return this.position.clone();
+    }
+    setPosition(position) {
+        this.position = position;
+    }
+    getSize() {
+        return this.size.clone();
+    }
+    setSize(size) {
+        this.size = size;
+    }
+    getIntersection(rayWalker) {
+        let position = rayWalker.getPosition();
+        let direction = rayWalker.getRay().getDirection();
+        let xDistance = this.getDistanceToEdge(position.x, direction.x, this.position.x, this.size.x);
+        let yDistance = this.getDistanceToEdge(position.y, direction.y, this.position.y, this.size.y);
+        let zDistance = this.getDistanceToEdge(position.z, direction.z, this.position.z, this.size.z);
+        let distance = Math.min(xDistance, yDistance, zDistance);
+        return isFinite(distance) ? distance : null;
+    }
+    getDistanceToEdge(position, direction, thisPosition, thisSize) {
+        if (direction === 0) {
+            return Infinity;
+        }
+        else if (direction > 0) {
+            return (thisPosition - position) / direction;
+        }
+        else {
+            return (thisPosition + thisSize - position) / -direction;
+        }
+    }
+}
+
+class PhysicalModel {
+    component;
+    constructor(component) {
+        this.component = component;
+    }
+    updateHitboxes() {
+    }
+    getHitboxes() {
+        return this.component.getHitboxes();
+    }
+    getIntersection(rayWalker) {
+        let distance = Infinity;
+        for (let hitbox of this.getHitboxes()) {
+            let intersection = hitbox.getIntersection(rayWalker);
+            if (intersection !== null) {
+                distance = Math.min(distance, intersection);
+            }
+        }
+        return isFinite(distance) ? distance : null;
+    }
+}
+
+class HandleableVector3D extends MutableVector3D {
+    _listeners;
+    constructor(x = 0, y = 0, z = 0) {
+        super(x, y, z);
+        this._listeners = new Set();
+    }
+    on(type, handler) {
+        if (type == 'change') {
+            this._listeners.add(handler);
+        }
+        else {
+            throw new Error('Unknown event type');
+        }
+    }
+    cause(type) {
+        if (type == 'change') {
+            for (const listener of this._listeners) {
+                listener();
+            }
+        }
+        else {
+            throw new Error('Unknown event type');
+        }
+    }
+    _set(x, y, z) {
+        this.cause('change');
+        return super._set(x, y, z);
+    }
+    clone() {
+        throw new Error("Cannot clone handleable vector. Instead use immutable() or mutable() to output a non-handlable vector.");
+    }
+    immutable() {
+        return new ImmutableVector3D(this.x, this.y, this.z);
+    }
+    mutable() {
+        return new MutableVector3D(this.x, this.y, this.z);
+    }
+    static from(vector, format) {
+        const values = [...Vector3D._from(vector, format)];
+        return new HandleableVector3D(values[0], values[1], values[2]);
+    }
+}
+
+class BaseEntity {
+    id;
+    chunk;
+    world;
+    position = new HandleableVector3D();
+    rotation = new Rotation();
+    constructor() {
+        this.position.on('change', () => {
+            // If the entity is not in a world or chunk, it doesn't need to update it's chunk
+            if (this.world && this.chunk) {
+                // Compute the location of the chunk the entity should be moved to.
+                const targetChunkX = Math.floor(this.position.x / ChunkDataReferencer.dimensions.x);
+                const targetChunkZ = Math.floor(this.position.z / ChunkDataReferencer.dimensions.z);
+                // Get the location of the chunk object that currently contains the entity.
+                const currentChunkPosition = this.chunk.getPosition();
+                const currentChunkX = currentChunkPosition.x;
+                const currentChunkZ = currentChunkPosition.y;
+                // Check if the entity should move to a different chunk.
+                if (currentChunkX != targetChunkX || currentChunkZ != targetChunkZ) {
+                    // Get the chunk that the entity should be in.
+                    let chunk = this.world.getChunk(targetChunkX, targetChunkZ);
+                    if (!chunk) {
+                        chunk = this.world.loadChunk(targetChunkX, targetChunkZ);
+                    }
+                    // Update the chunk the entity is in.
+                    this.setParentChunk(chunk);
+                }
+            }
+        });
+        this.id = BaseEntity.generateUniqueId();
+    }
+    setWorld(world) {
+        if (world == null) {
+            this.world = null;
+            this.chunk = null;
+            return;
+        }
+        // Set the entity's properties to be in the world.
+        this.world = world;
+        this.chunk = null;
+        // Compute the location of the chunk the entity should be placed in.
+        const targetChunkX = Math.floor(this.position.x / ChunkDataReferencer.dimensions.x);
+        const targetChunkZ = Math.floor(this.position.z / ChunkDataReferencer.dimensions.z);
+        // Get the chunk object that the entity should be placed in.
+        let targetChunk = this.world.getChunk(targetChunkX, targetChunkZ);
+        // If the chunk object doesn't exist and the entity can load new chunks, load the chunk.
+        if (!targetChunk && this.canLoadChunks()) {
+            this.world.loadChunk(targetChunkX, targetChunkZ);
+            targetChunk = this.world.getChunk(targetChunkX, targetChunkZ);
+        }
+        // Update the chunk the entity is in.
+        this.setParentChunk(targetChunk);
+    }
+    getWorld() {
+        return this.world;
+    }
+    setParentChunk(chunk) {
+        if (this.chunk && !this.chunk.isPlaceholder())
+            this.chunk.getChunkData().removeEntity(this);
+        this.chunk = chunk;
+        if (this.chunk && !this.chunk.isPlaceholder())
+            this.chunk.getChunkData().addEntity(this);
+    }
+    getParentChunk() {
+        return this.chunk;
+    }
+    async tickEntity(delta) {
+    }
+    getPosition() {
+        return this.position;
+    }
+    setPosition(x, y, z) {
+        if (x instanceof Vector3D) {
+            this.position.set(x.x, x.y, x.z);
+        }
+        else if (typeof y == 'number' && typeof z == 'number') {
+            this.position.set(x, y, z);
+        }
+        else {
+            throw new Error("Invalid arguments to BaseEntity.setPosition()");
+        }
+    }
+    getRotation() {
+        return this.rotation;
+    }
+    setRotation(rotation) {
+        this.rotation = rotation;
+    }
+    getUniqueId() {
+        return this.id;
+    }
+    getEntityModel() {
+        return null;
+    }
+    getPhysicalEntity() {
+        return null;
+    }
+    whenJoinWorld() {
+    }
+    getPhysicalState() {
+        return null;
+    }
+    getPhysicalProperties() {
+        return null;
+    }
+    static generateUniqueId() {
+        return crypto.randomUUID();
+    }
+}
+
+class PlayerEntity extends BaseEntity {
+    physicalState = new PhysicalEntityState();
+    physicalProperties = {
+        gravity: -0.3,
+        friction: {
+            air: 0.01,
+            ground: 0.5
+        },
+        model: new PhysicalModel(new BoxPhysicalComponent(new PhysicalHitbox(new ImmutableVector3D(0, 0, 0), new ImmutableVector3D(1, 1.8, 1))))
+    };
+    getPrototype() {
+        return Registries.entities.get('player');
+    }
+    canLoadChunks() {
+        return true;
+    }
+    async tickEntity(delta) {
+        super.tickEntity(delta);
+        EntityPhysics.simulateEntity(this, delta);
+    }
+    getPhysicalProperties() {
+        return this.physicalProperties;
+    }
+    getPhysicalState() {
+        return this.physicalState;
+    }
+}
+
+class PlayerPrototype extends BaseEntityPrototype {
+    createEntity() {
+        return new PlayerEntity();
+    }
+}
+
+async function loadGameContent() {
+    Registries.entities.register('player', new PlayerPrototype());
+    await StonePrototype.setup();
+    Registries.blocks.register('stone', new StonePrototype());
+    Registries.blockModels.register('stone', StonePrototype.getBlockModel());
+    await DirtPrototype.setup();
+    Registries.blocks.register('dirt', new DirtPrototype());
+    Registries.blockModels.register('dirt', DirtPrototype.getBlockModel());
+    Registries.blocks.register('air', new AirPrototype());
+}
+
 class EventClock {
     tasks = new Set();
     delta = 0;
-    time = 0;
+    tick = 0;
+    startTime = null;
+    lastTime = null;
+    taskInfo = null;
     constructor() {
     }
-    runOnce(task) {
+    runOnce(name, task) {
         const wrapper = () => {
             task();
             this.unschedule(wrapper);
         };
-        this.schedule(wrapper);
+        this.schedule(name, wrapper);
     }
-    schedule(task) {
-        this.tasks.add(task);
+    schedule(name, task) {
+        this.tasks.add({
+            name,
+            handler: task
+        });
     }
-    unschedule(task) {
-        this.tasks.delete(task);
+    unschedule(identifier) {
+        for (const task of this.tasks) {
+            if (task.handler === identifier || task.name === identifier) {
+                this.tasks.delete(task);
+            }
+        }
     }
     getDelta() {
-        return this.delta;
+        return this.delta / 1000;
     }
-    getCurrentTime() {
-        return this.time;
+    getTime() {
+        if (this.startTime === null)
+            throw new Error("Clock not started");
+        return Date.now() - this.startTime;
+    }
+    getTick() {
+        return this.tick;
+    }
+    getTaskInfo() {
+        return this.taskInfo;
     }
     async start() {
-        let start = Date.now();
-        for (const task of this.tasks) {
-            await task();
+        if (this.lastTime === null) {
+            this.lastTime = Date.now();
+            this.startTime = Date.now();
         }
-        this.delta = Date.now() - start;
-        this.time++;
+        const frameDelay = Date.now() - this.lastTime;
+        const tasks = [];
+        for (const task of this.tasks) {
+            let start = Date.now();
+            await task.handler();
+            tasks.push({
+                name: task.name,
+                time: Date.now() - start
+            });
+        }
+        this.delta = Date.now() - this.lastTime;
+        this.lastTime = Date.now();
+        tasks.unshift({
+            name: "frameDelay",
+            time: frameDelay
+        });
+        this.taskInfo = {
+            tasks,
+            delta: this.delta,
+            tick: this.tick,
+            time: this.getTime()
+        };
+        this.tick++;
+        requestAnimationFrame(() => this.start());
     }
 }
 
@@ -1876,9 +2610,10 @@ class Game {
         await Game.init.run();
         Registries.fields.register('blockId', new ChunkDataNumberAllocation('u16'));
         await loadGameContent();
-        Registries.blocks.allocate();
-        Registries.textures.allocate();
-        Registries.blocks.allocate();
+        await Registries.blocks.setup();
+        await Registries.textures.setup();
+        await Registries.blockModels.setup();
+        //await new Promise(resolve => setTimeout(resolve, 10000));
     }
     isGameClient() {
         return this.getRuntimeType() === GameRuntimeType.Singleplayer || this.getRuntimeType() === GameRuntimeType.MultiplayerClient;
@@ -1961,6 +2696,13 @@ class Color {
         return new Color(red, green, blue, alpha);
     }
 }
+
+var Axis;
+(function (Axis) {
+    Axis[Axis["X"] = 0] = "X";
+    Axis[Axis["Y"] = 1] = "Y";
+    Axis[Axis["Z"] = 2] = "Z";
+})(Axis || (Axis = {}));
 
 class Matrix4 {
     data;
@@ -2123,62 +2865,70 @@ class Matrix4 {
     }
     static createRotation(rotation, target = new Matrix4()) {
         let matrix = target || new Matrix4();
-        matrix.multiply(Matrix4.createRotationY(rotation.yaw));
-        matrix.multiply(Matrix4.createRotationX(rotation.pitch));
-        matrix.multiply(Matrix4.createRotationZ(rotation.roll));
+        matrix.multiply(Matrix4.createWorldAxisRotation(Axis.Y, rotation.yaw));
+        matrix.multiply(Matrix4.createWorldAxisRotation(Axis.X, rotation.pitch));
+        matrix.multiply(Matrix4.createWorldAxisRotation(Axis.Z, rotation.roll));
         return matrix;
     }
-    static createRotationX(angle, target = new Matrix4()) {
-        const cos = Math.cos(angle);
+    static createWorldAxisRotation(axis, angle) {
         const sin = Math.sin(angle);
+        const cos = Math.cos(angle);
+        if (axis == Axis.X) {
+            return new Matrix4([
+                1, 0, 0, 0,
+                0, cos, sin, 0,
+                0, -sin, cos, 0,
+                0, 0, 0, 1
+            ]);
+        }
+        else if (axis == Axis.Y) {
+            return new Matrix4([
+                cos, 0, -sin, 0,
+                0, 1, 0, 0,
+                sin, 0, cos, 0,
+                0, 0, 0, 1
+            ]);
+        }
+        else if (axis == Axis.Z) {
+            return new Matrix4([
+                cos, sin, 0, 0,
+                -sin, cos, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
+            ]);
+        }
+        return new Matrix4();
+    }
+    static createPerspective(fov, aspect, near, far, target = new Matrix4()) {
+        const f = Math.tan(Math.PI * 0.5 - 0.5 * fov);
+        const rangeInv = 1 / (near - far);
+        target.data[0] = f / aspect;
+        target.data[1] = 0;
+        target.data[2] = 0;
+        target.data[3] = 0;
+        target.data[4] = 0;
+        target.data[5] = f;
+        target.data[6] = 0;
+        target.data[7] = 0;
+        target.data[8] = 0;
+        target.data[9] = 0;
+        target.data[10] = far * rangeInv;
+        target.data[11] = -1;
+        target.data[12] = 0;
+        target.data[13] = 0;
+        target.data[14] = near * far * rangeInv;
+        target.data[15] = 0;
+        return target;
+    }
+    static identity(target) {
+        if (!target)
+            return new Matrix4();
         target.data[0] = 1;
         target.data[1] = 0;
         target.data[2] = 0;
         target.data[3] = 0;
         target.data[4] = 0;
-        target.data[5] = cos;
-        target.data[6] = sin;
-        target.data[7] = 0;
-        target.data[8] = 0;
-        target.data[9] = -sin;
-        target.data[10] = cos;
-        target.data[11] = 0;
-        target.data[12] = 0;
-        target.data[13] = 0;
-        target.data[14] = 0;
-        target.data[15] = 1;
-        return target;
-    }
-    static createRotationY(angle, target = new Matrix4()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = cos;
-        target.data[1] = 0;
-        target.data[2] = -sin;
-        target.data[3] = 0;
-        target.data[4] = 0;
         target.data[5] = 1;
-        target.data[6] = 0;
-        target.data[7] = 0;
-        target.data[8] = sin;
-        target.data[9] = 0;
-        target.data[10] = cos;
-        target.data[11] = 0;
-        target.data[12] = 0;
-        target.data[13] = 0;
-        target.data[14] = 0;
-        target.data[15] = 1;
-        return target;
-    }
-    static createRotationZ(angle, target = new Matrix4()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = cos;
-        target.data[1] = sin;
-        target.data[2] = 0;
-        target.data[3] = 0;
-        target.data[4] = -sin;
-        target.data[5] = cos;
         target.data[6] = 0;
         target.data[7] = 0;
         target.data[8] = 0;
@@ -2191,27 +2941,6 @@ class Matrix4 {
         target.data[15] = 1;
         return target;
     }
-    static createPerspective(fov, aspect, near, far, target = new Matrix4()) {
-        const f = 1 / Math.tan(fov / 2);
-        const nf = 1 / (near - far);
-        target.data[0] = f / aspect;
-        target.data[1] = 0;
-        target.data[2] = 0;
-        target.data[3] = 0;
-        target.data[4] = 0;
-        target.data[5] = f;
-        target.data[6] = 0;
-        target.data[7] = 0;
-        target.data[8] = 0;
-        target.data[9] = 0;
-        target.data[10] = (far + near) * nf;
-        target.data[11] = -1;
-        target.data[12] = 0;
-        target.data[13] = 0;
-        target.data[14] = 2 * far * near * nf;
-        target.data[15] = 0;
-        return target;
-    }
 }
 
 class Projector {
@@ -2220,7 +2949,7 @@ class Projector {
     near;
     far;
     projectionMatrix = null;
-    constructor(fieldOfView = 45, aspect = 1, near = 0.1, far = 1000) {
+    constructor(fieldOfView = Math.PI / 180 * 75, aspect = 1, near = 0.1, far = 1000) {
         this.fieldOfView = fieldOfView;
         this.aspect = aspect;
         this.near = near;
@@ -2283,11 +3012,12 @@ var Bindings;
 (function (Bindings) {
     Bindings.CameraBindGroup = 0;
     Bindings.CameraDataBinding = 0;
-    Bindings.BlockModelBindGroup = 1;
+    Bindings.TerrainBindGroup = 1;
     Bindings.BlockModelGeometryBinding = 0;
     Bindings.BlockModelTextureMappingBinding = 1;
     Bindings.BlockModelTextureBinding = 2;
     Bindings.BlockModelTextureSamplerBinding = 3;
+    Bindings.ChunkPositionBinding = 4;
 })(Bindings || (Bindings = {}));
 
 class BindGroup {
@@ -2295,8 +3025,10 @@ class BindGroup {
     entries = new Set();
     layout;
     group;
+    creationStack;
     constructor(index) {
         this.index = index;
+        this.creationStack = new Error().stack ;
     }
     async setup(device) {
         for (const entry of this.entries) {
@@ -2307,11 +3039,11 @@ class BindGroup {
             layoutEntries.push(entry.getLayoutEntry());
         }
         this.layout = device.getDevice().createBindGroupLayout({
+            label: `Bind Group Layout ${this.index}`,
             entries: layoutEntries
         });
         const bindGroupEntries = [];
         for (const entry of this.entries) {
-            console.log(entry.getBindGroupEntry());
             bindGroupEntries.push(entry.getBindGroupEntry());
         }
         this.group = device.getDevice().createBindGroup({
@@ -2319,6 +3051,29 @@ class BindGroup {
             layout: this.layout,
             entries: bindGroupEntries
         });
+        {
+            console.groupCollapsed("GPU Bind Group #" + this.index);
+            console.log(this.group);
+            console.log(this.layout);
+            console.groupCollapsed("Entries");
+            for (const entry of this.entries) {
+                console.groupCollapsed(entry.getLabel());
+                console.log(entry.getBindGroupEntry());
+                console.log(entry.getLayoutEntry());
+                console.log(entry);
+                console.groupEnd();
+            }
+            console.groupEnd();
+            console.groupCollapsed("Stack traces");
+            if (this.creationStack) {
+                console.log("%cnew BindGroup()%c\n" + this.creationStack.split("\n").slice(1).join("\n"), "text-decoration: underline;", "");
+            }
+            const stack = new Error().stack;
+            if (stack)
+                console.log("%cbindGroup.setup()%c\n" + stack.split("\n").slice(1).join("\n"), "text-decoration: underline;", "");
+            console.groupEnd();
+            console.groupEnd();
+        }
     }
     addEntry(binding, entry) {
         this.entries.add(entry);
@@ -2333,20 +3088,38 @@ class BindGroup {
     getBindGroup() {
         return this.group;
     }
+    static LOGGING = true;
 }
 
-class BufferBindGroupEntry {
+class BaseBindGroupEntry {
+    binding;
+    label = "";
+    setLabel(label) {
+        this.label = label;
+    }
+    getLabel(defaultValue) {
+        return this.label + (defaultValue ? " - " + defaultValue : "") + ` (Index ${this.binding})`;
+    }
+    getBinding() {
+        return this.binding;
+    }
+    setBinding(index) {
+        this.binding = index;
+    }
+}
+
+class BufferBindGroupEntry extends BaseBindGroupEntry {
     buffer;
     visibility;
     type;
-    binding;
     constructor(buffer, visibility, type) {
+        super();
         this.buffer = buffer;
         this.visibility = visibility;
         this.type = type;
     }
-    setBinding(index) {
-        this.binding = index;
+    getLabel() {
+        return super.getLabel("Buffer");
     }
     async setup(device) {
     }
@@ -2374,6 +3147,7 @@ class Camera {
     bindGroupEntry;
     buffer;
     perspective;
+    projector;
     async setup(device) {
         this.buffer = device.getDevice().createBuffer({
             size: 4 * 4 * 32 * 2,
@@ -2381,14 +3155,76 @@ class Camera {
         });
         this.bindGroup = new BindGroup(Bindings.CameraBindGroup);
         this.bindGroupEntry = new BufferBindGroupEntry(this.buffer, GPUShaderStage.VERTEX, "uniform");
+        this.bindGroupEntry.setLabel("Camera");
         this.bindGroup.addEntry(Bindings.CameraDataBinding, this.bindGroupEntry);
-        await this.bindGroup.setup(device);
     }
     setPerspective(perspective) {
         this.perspective = perspective;
     }
+    setProjector(projector) {
+        this.projector = projector;
+    }
     getCameraBindGroup() {
         return this.bindGroup;
+    }
+    update(device) {
+        if (!this.projector)
+            throw new Error('Projector is not set before updating camera');
+        const data = new Float32Array(4 * 4);
+        const viewMatrix = Matrix4.inverse(this.perspective?.getTransformationMatrix() || Matrix4.identity());
+        if (!viewMatrix)
+            throw new Error('Translation matrix is not invertible');
+        const cameraMatrix = Matrix4.multiply(this.projector.getProjectionMatrix(), viewMatrix);
+        data.set(cameraMatrix.data, 0);
+        device.getDevice().queue.writeBuffer(this.buffer, 0, data);
+    }
+    getDataBuffer() {
+        return this.buffer;
+    }
+    static TEST_PROJECTION = false;
+    static TEST_VIEW = false;
+}
+
+class DepthTexture {
+    texture;
+    device;
+    width;
+    height;
+    view;
+    async resize(width, height) {
+        if (this.width === width && this.height === height)
+            return;
+        this.width = width;
+        this.height = height;
+        if (this.texture)
+            this.texture.destroy();
+        this.texture = this.device.getDevice().createTexture({
+            label: "Depth Texture",
+            format: 'depth24plus',
+            size: [this.width, this.height],
+            usage: GPUTextureUsage.RENDER_ATTACHMENT
+        });
+        this.view = this.texture.createView({ label: "Depth Texture [View]" });
+    }
+    async setup(device) {
+        this.device = device;
+    }
+    addToPipelineDescriptor(descriptor) {
+        descriptor.depthStencil = {
+            format: 'depth24plus',
+            depthWriteEnabled: true,
+            depthCompare: 'less'
+        };
+    }
+    addToRenderPassDescriptor(descriptor) {
+        descriptor.depthStencilAttachment = {
+            view: this.view,
+            depthLoadOp: 'load',
+            depthStoreOp: 'store'
+        };
+    }
+    createView() {
+        return this.view;
     }
 }
 
@@ -2447,25 +3283,36 @@ class ClearRenderPass {
     }
     async setupBindings(device) {
     }
-    render(commandEncoder) {
+    async render() {
+        const commandEncoder = this.device.getDevice().createCommandEncoder({
+            label: "Clear Render Pass / Command Encoder"
+        });
         const renderPassDescriptor = {
             colorAttachments: [
                 {
                     clearValue: Color.toGPUColor(this.color),
                     loadOp: "clear",
                     storeOp: "store",
-                    view: this.device.getContext().getCurrentTexture().createView()
+                    view: this.device.getContext().getCurrentTexture().createView({
+                        label: "Canvas Texture [View]"
+                    })
                 }
-            ]
+            ],
+            depthStencilAttachment: {
+                view: this.device.getRenderer().getDepthTexture().createView(),
+                depthClearValue: 1.0,
+                depthLoadOp: 'clear',
+                depthStoreOp: 'store'
+            }
         };
         const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
         renderPass.end();
+        this.device.getDevice().queue.submit([commandEncoder.finish()]);
     }
 }
 
-class TextureSampler {
+class TextureSampler extends BaseBindGroupEntry {
     sampler;
-    binding;
     getLayoutEntry() {
         return {
             binding: this.binding,
@@ -2473,14 +3320,14 @@ class TextureSampler {
             sampler: {}
         };
     }
+    getLabel() {
+        return super.getLabel("Texture Sampler");
+    }
     getBindGroupEntry() {
         return {
             binding: this.binding,
             resource: this.sampler
         };
-    }
-    setBinding(index) {
-        this.binding = index;
     }
     async setup(device) {
         this.sampler = device.getDevice().createSampler({
@@ -2493,16 +3340,15 @@ class TextureSampler {
     }
 }
 
-class WebGPUTexture {
+class WebGPUTexture extends BaseBindGroupEntry {
     source;
-    texture;
-    device;
-    binding;
+    texture = null;
     constructor(source) {
+        super();
         this.source = source;
     }
-    setBinding(index) {
-        this.binding = index;
+    getLabel() {
+        return super.getLabel("Texture");
     }
     getLayoutEntry() {
         return {
@@ -2520,7 +3366,7 @@ class WebGPUTexture {
         }
         return {
             binding: this.binding,
-            resource: this.texture.createView()
+            resource: this.texture.createView({ label: this.getLabel() + ' [View]' })
         };
     }
     getTexture() {
@@ -2529,9 +3375,12 @@ class WebGPUTexture {
         }
         return this.texture;
     }
+    getBinding() {
+        return this.binding;
+    }
     async setup(device) {
-        this.device = device;
         this.texture = device.getDevice().createTexture({
+            label: this.label,
             size: [
                 this.source.getTextureWidth(),
                 this.source.getTextureHeight()
@@ -2542,6 +3391,22 @@ class WebGPUTexture {
         device.getDevice().queue.writeTexture({ texture: this.texture }, this.source.toDataArray(), { bytesPerRow: this.source.getTextureWidth() * 4, rowsPerImage: this.source.getTextureHeight() }, [this.source.getTextureWidth(), this.source.getTextureHeight()]);
     }
 }
+
+var BufferAlignment;
+(function (BufferAlignment) {
+    function alignItems(data, size, alignedSize) {
+        let dataArray = new Uint8Array(data);
+        let items = dataArray.length / size;
+        let alignedArray = new Uint8Array(items * (alignedSize));
+        for (let i = 0; i < items; i++) {
+            let offset = i * size;
+            let alignedOffset = i * alignedSize;
+            alignedArray.set(dataArray.slice(offset, offset + size), alignedOffset);
+        }
+        return alignedArray.buffer;
+    }
+    BufferAlignment.alignItems = alignItems;
+})(BufferAlignment || (BufferAlignment = {}));
 
 class ShaderModule {
     label;
@@ -2597,6 +3462,7 @@ class BaseRenderPass {
     pipelineLayout;
     bindGroupManager;
     device;
+    depthTest = false;
     setBindGroupManager(bindGroupManager) {
         this.bindGroupManager = new PipelineBindGroupManager(bindGroupManager);
     }
@@ -2604,8 +3470,12 @@ class BaseRenderPass {
         const gpuDevice = device.getDevice();
         const layoutDescriptor = {};
         this.bindGroupManager.addBindGroupsToPipelineLayout(layoutDescriptor);
+        console.log(layoutDescriptor);
         this.pipelineLayout = gpuDevice.createPipelineLayout(layoutDescriptor);
         this.descriptor.layout = this.pipelineLayout;
+        if (this.depthTest) {
+            device.getRenderer().getDepthTexture().addToPipelineDescriptor(this.descriptor);
+        }
         this.pipeline = gpuDevice.createRenderPipeline(this.descriptor);
         this.device = device;
     }
@@ -2641,20 +3511,28 @@ class BaseRenderPass {
     getPipelineLayout() {
         return this.pipelineLayout;
     }
-    render(commandEncoder) {
-        const renderPass = commandEncoder.beginRenderPass({
+    createCommandEncoder(passLabel) {
+        return this.device.getDevice().createCommandEncoder({
+            label: `${passLabel} / Command Encoder`
+        });
+    }
+    createRenderPass(commandEncoder) {
+        const renderPassDescriptor = {
             colorAttachments: [
                 {
-                    view: this.device.getContext().getCurrentTexture().createView(),
+                    view: this.device.getContext().getCurrentTexture().createView({ label: "Canvas Texture [View]" }),
                     loadOp: "load",
                     storeOp: "store"
                 }
             ]
-        });
+        };
+        if (this.depthTest) {
+            this.device.getRenderer().getDepthTexture().addToRenderPassDescriptor(renderPassDescriptor);
+        }
+        const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
         this.bindGroupManager.setBindGroupsOnRenderPassEncoder(renderPass);
         renderPass.setPipeline(this.pipeline);
-        this.draw(renderPass, commandEncoder);
-        renderPass.end();
+        return renderPass;
     }
     getGraphicsDevice() {
         return this.device;
@@ -2664,6 +3542,8 @@ class BaseRenderPass {
 class TerrainRenderPass extends BaseRenderPass {
     worldMirror;
     indirectDrawBuffer;
+    chunkPositionBuffer;
+    depthTest = true;
     constructor(worldMirror) {
         super();
         this.worldMirror = worldMirror;
@@ -2672,12 +3552,12 @@ class TerrainRenderPass extends BaseRenderPass {
         const gpuDevice = device.getDevice();
         this.indirectDrawBuffer = gpuDevice.createBuffer({
             label: "Terrain Indirect Draw Buffer",
-            usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.STORAGE,
-            size: ChunkDataReferencer.cells * 16
+            usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            size: ChunkDataReferencer.cells * 4 * 4
         });
         const shader = await ShaderModule.import("/assets/shaders/terrain.wgsl", "Terrain Shader");
         shader.setup(device);
-        this.addPrimitiveTopology("triangle-list", "back");
+        this.addPrimitiveTopology("triangle-list");
         this.addLabel("Terrain Render Pass");
         this.addVertexStage(shader, "vertex_main");
         this.addFragmentStage(shader, "fragment_main");
@@ -2685,53 +3565,90 @@ class TerrainRenderPass extends BaseRenderPass {
         await this.setupBlockModelBindings(device);
     }
     async setupBlockModelBindings(device) {
-        const blockModelBindGroup = new BindGroup(Bindings.BlockModelBindGroup);
-        await this.setupGeometryBindings(blockModelBindGroup, device);
-        await this.setupTextureMappingBindings(blockModelBindGroup, device);
-        await this.setupTextureBindings(blockModelBindGroup, device);
-        await this.setupTextureSamplerBindings(blockModelBindGroup, device);
-        this.getBindGroupManager().useBindGroup(blockModelBindGroup);
+        const terrainBindGroup = new BindGroup(Bindings.TerrainBindGroup);
+        await this.setupGeometryBindings(terrainBindGroup, device);
+        await this.setupTextureMappingBindings(terrainBindGroup, device);
+        await this.setupTextureBindings(terrainBindGroup, device);
+        await this.setupTextureSamplerBindings(terrainBindGroup, device);
+        await this.setupChunkPositionBindings(terrainBindGroup, device);
+        this.getBindGroupManager().useBindGroup(terrainBindGroup);
     }
     async setupGeometryBindings(bindGroup, device) {
         const gpuDevice = device.getDevice();
-        const geometryData = this.worldMirror.getTerrainMesh().getVertexPositions();
+        const geometryData = this.worldMirror.getTerrainMesh().getVertexPositions().buffer;
+        const alignedData = BufferAlignment.alignItems(geometryData, 12, 16);
         const geometryBuffer = gpuDevice.createBuffer({
-            label: "Terrain Geometry Buffer",
-            size: geometryData.byteLength,
+            label: "Block Geometry Buffer",
+            size: alignedData.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
         });
-        gpuDevice.queue.writeBuffer(geometryBuffer, 0, geometryData);
+        gpuDevice.queue.writeBuffer(geometryBuffer, 0, alignedData);
         const geometryBindGroupEntry = new BufferBindGroupEntry(geometryBuffer, GPUShaderStage.VERTEX, "read-only-storage");
+        geometryBindGroupEntry.setLabel("Block Geometry");
         bindGroup.addEntry(Bindings.BlockModelGeometryBinding, geometryBindGroupEntry);
     }
     async setupTextureMappingBindings(bindGroup, device) {
         const gpuDevice = device.getDevice();
         const textureMappingData = this.worldMirror.getTerrainMesh().getTextureMappings();
         const textureMappingBuffer = gpuDevice.createBuffer({
-            label: "Terrain Texture Mapping Buffer",
+            label: "Block Texture Mapping Buffer",
             size: textureMappingData.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
         });
         gpuDevice.queue.writeBuffer(textureMappingBuffer, 0, textureMappingData);
         const textureMappingBindGroupEntry = new BufferBindGroupEntry(textureMappingBuffer, GPUShaderStage.VERTEX, "read-only-storage");
+        textureMappingBindGroupEntry.setLabel("Block Texture Mapping");
         bindGroup.addEntry(Bindings.BlockModelTextureMappingBinding, textureMappingBindGroupEntry);
     }
     async setupTextureBindings(bindGroup, device) {
         const texture = this.worldMirror.getTerrainMesh().getTexture();
         const gpuTexture = new WebGPUTexture(texture);
+        gpuTexture.setLabel("Block Texture Atlas");
         bindGroup.addEntry(Bindings.BlockModelTextureBinding, gpuTexture);
     }
     async setupTextureSamplerBindings(bindGroup, device) {
         const textureSampler = new TextureSampler();
+        textureSampler.setLabel("Block Texture Sampler");
         bindGroup.addEntry(Bindings.BlockModelTextureSamplerBinding, textureSampler);
     }
-    draw(renderPass, commandEncoder) {
+    async setupChunkPositionBindings(bindGroup, device) {
+        const gpuDevice = device.getDevice();
+        const buffer = gpuDevice.createBuffer({
+            label: "Chunk Position",
+            size: 8,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+        });
+        const entry = new BufferBindGroupEntry(buffer, GPUShaderStage.VERTEX, "uniform");
+        entry.setLabel("Chunk Position");
+        bindGroup.addEntry(Bindings.ChunkPositionBinding, entry);
+        this.chunkPositionBuffer = buffer;
+    }
+    async render() {
         const gpuDevice = this.getGraphicsDevice().getDevice();
         for (const chunk of this.worldMirror.getVisibleChunks()) {
-            gpuDevice.queue.writeBuffer(this.indirectDrawBuffer, 0, chunk.getIndirectDrawCalls());
-            renderPass.drawIndirect(this.indirectDrawBuffer, 0);
+            const commandEncoder = this.createCommandEncoder("Terrain Render Pass");
+            const renderPass = this.createRenderPass(commandEncoder);
+            gpuDevice.queue.writeBuffer(this.chunkPositionBuffer, 0, new Float32Array(chunk.getPosition()));
+            this._draw(renderPass, gpuDevice, chunk.getIndirectDrawCalls(), chunk.getIndirectCallCount());
+            renderPass.end();
+            gpuDevice.queue.submit([commandEncoder.finish()]);
         }
     }
+    _draw(renderPass, gpuDevice, buffer, callsLength) {
+        {
+            const drawCalls = new Uint32Array(buffer);
+            for (let i = 0; i < drawCalls.length; i += 4) {
+                const vertexCount = drawCalls[i + 0];
+                const instanceCount = drawCalls[i + 1];
+                const firstVertex = drawCalls[i + 2];
+                const firstInstance = drawCalls[i + 3];
+                if (vertexCount === 0 || instanceCount === 0)
+                    continue;
+                renderPass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+            }
+        }
+    }
+    static DISABLE_INDIRECT_DRAWING_FOR_DEBUGGING = true;
 }
 
 class RenderWorldMirror {
@@ -2779,14 +3696,12 @@ class AssembledMesh {
     vertexPositions;
     textureMappings;
     texture;
-    startIndex;
-    endIndex;
-    constructor(vertexPositions, textureMappings, texture, startIndex, endIndex) {
+    indexes;
+    constructor(vertexPositions, textureMappings, texture, indexes) {
         this.vertexPositions = vertexPositions;
         this.textureMappings = textureMappings;
         this.texture = texture;
-        this.startIndex = startIndex;
-        this.endIndex = endIndex;
+        this.indexes = indexes;
     }
     getVertexPositions() {
         return this.vertexPositions;
@@ -2798,14 +3713,14 @@ class AssembledMesh {
         return this.texture;
     }
     getModelStartIndex(model) {
-        if (!this.startIndex.has(model))
+        if (!this.indexes.has(model))
             throw new Error('Model not found in mesh assembler');
-        return this.startIndex.get(model);
+        return this.indexes.get(model)[0];
     }
     getModelEndIndex(model) {
-        if (!this.endIndex.has(model))
+        if (!this.indexes.has(model))
             throw new Error('Model not found in mesh assembler');
-        return this.endIndex.get(model);
+        return this.indexes.get(model)[1];
     }
 }
 
@@ -2814,57 +3729,102 @@ class MeshAssembler {
     vertexPositions;
     textureMappings;
     texture;
-    startIndex;
-    endIndex;
+    modelIndexes;
     constructor(models) {
         this.models = Array.from(models);
     }
-    assembleMeshes() {
-        if (this.texture) {
-            return this.createAssembledMesh();
+    setupModelsAndIndexes() {
+        {
+            console.groupCollapsed("Models");
         }
-        this.startIndex = new Map();
-        this.endIndex = new Map();
+        this.modelIndexes = new Map();
         const modelVertexPositions = [];
         const modelTextureMappings = [];
         const modelTextureIds = [];
+        let modelIndex = 0;
         let vertexIndex = 0;
         for (const model of this.models) {
             const vertexPositions = model.getVertexPositions();
             const textureMappings = model.getTextureMappings();
             const textureIds = model.getTextureIds();
-            this.startIndex.set(model, vertexIndex);
+            const startIndex = vertexIndex;
             modelVertexPositions.push(vertexPositions);
             modelTextureMappings.push(textureMappings);
             modelTextureIds.push(textureIds);
+            {
+                console.groupCollapsed(`Model ${modelIndex}: ${model.getRegisteredName()}`);
+                console.groupCollapsed("Vertex positions");
+                console.log(vertexPositions);
+                console.groupEnd();
+                console.groupCollapsed("Texture mappings");
+                console.log(textureMappings);
+                console.groupEnd();
+                console.groupCollapsed("Texture ids");
+                console.log(textureIds);
+                console.groupEnd();
+                console.groupEnd();
+            }
             vertexIndex += vertexPositions.length / 3;
-            this.endIndex.set(model, vertexIndex);
+            const endIndex = vertexIndex;
+            this.modelIndexes.set(model, [startIndex, endIndex]);
+            modelIndex++;
         }
-        this.vertexPositions = new Float32Array(DataUtils.concat(modelVertexPositions));
+        {
+            console.groupEnd();
+        }
+        return {
+            modelGeometries: modelVertexPositions,
+            modelTextureMappings: modelTextureMappings,
+            modelTextureIds: modelTextureIds,
+            totalVertexCount: vertexIndex
+        };
+    }
+    assembleMeshes() {
+        if (this.texture) {
+            return this.createAssembledMesh();
+        }
+        {
+            console.groupCollapsed("Assembled mesh");
+        }
+        const { modelGeometries, modelTextureMappings, modelTextureIds, totalVertexCount } = this.setupModelsAndIndexes();
+        this.vertexPositions = new Float32Array(DataUtils.concat(modelGeometries));
         const textureArray = this.getTextureArrayFromModelTextureIds(modelTextureIds);
         const combinedSize = this.getCombinedTextureSize(textureArray);
         const { texturePositions, texture } = this.renderCombinedTextures(combinedSize, textureArray);
         this.texture = texture;
-        this.textureMappings = new Uint32Array(vertexIndex * 2);
+        this.textureMappings = new Float32Array(totalVertexCount * 2);
         for (let modelIndex = 0; modelIndex < modelTextureIds.length; modelIndex++) {
+            const modelIndexes = this.modelIndexes.get(this.models[modelIndex]);
+            if (!modelIndexes)
+                throw new Error(`Geometry indexing error with model ${modelIndex}`);
             const textureIds = modelTextureIds[modelIndex];
             const textureMappings = modelTextureMappings[modelIndex];
-            const vertexStart = this.startIndex[modelIndex];
             for (let triangleIndex = 0; triangleIndex < textureIds.length; triangleIndex++) {
                 const textureId = textureIds[triangleIndex];
                 const textureIndex = textureArray.indexOf(Registries.textures.get(textureId));
                 const texturePosition = texturePositions[textureIndex];
                 for (let vertexIndex = 0; vertexIndex < 3; vertexIndex++) {
-                    const vertexPosition = vertexStart + triangleIndex * 3 + vertexIndex;
-                    this.textureMappings[vertexPosition * 2] = textureMappings[triangleIndex * 2] + texturePosition;
-                    this.textureMappings[vertexPosition * 2 + 1] = textureMappings[triangleIndex * 2 + 1];
+                    const modelOffset = modelIndexes[0];
+                    const offset = (triangleIndex * 3 + vertexIndex) * 2;
+                    this.textureMappings[modelOffset * 2 + offset] = (textureMappings[offset] + texturePosition) / combinedSize.x;
+                    this.textureMappings[modelOffset * 2 + offset + 1] = (textureMappings[offset + 1]) / combinedSize.y;
                 }
             }
+        }
+        {
+            console.groupCollapsed("Vertex positions");
+            console.log(this.vertexPositions);
+            console.groupEnd();
+            console.groupCollapsed("Texture mappings");
+            console.log(this.textureMappings);
+            console.groupEnd();
+            console.log("%cTexture has been added to the bottom of the document", "font-style: italic;");
+            console.groupEnd();
         }
         return this.createAssembledMesh();
     }
     createAssembledMesh() {
-        return new AssembledMesh(this.vertexPositions, this.textureMappings, this.texture, this.startIndex, this.endIndex);
+        return new AssembledMesh(this.vertexPositions, this.textureMappings, this.texture, this.modelIndexes);
     }
     getTextureArrayFromModelTextureIds(modelTextureIds) {
         let textures = new Set();
@@ -2905,18 +3865,20 @@ class MeshAssembler {
             xOffset += texture.getTextureWidth();
             textureIndex++;
         }
-        canvas.convertToBlob().then(blob => {
-            const url = URL.createObjectURL(blob);
-            const img = new Image();
-            img.onload = () => {
-                URL.revokeObjectURL(url);
-            };
-            img.src = url;
-            document.body.appendChild(img);
-        });
+        {
+            canvas.convertToBlob().then(blob => {
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                };
+                img.src = url;
+            });
+        }
         const texture = Texture.fromImageData(context.getImageData(0, 0, size.x, size.y));
         return { texturePositions, texture };
     }
+    static PRINT_OUTPUT = true;
 }
 
 class InstancedDataSegment {
@@ -2937,6 +3899,9 @@ class InstancedDataSegment {
     getModel() {
         return this.model;
     }
+    setModel(model) {
+        this.model = model;
+    }
     getStartIndex() {
         return this.startIndex;
     }
@@ -2948,12 +3913,33 @@ class InstancedDataSegment {
 class InstancedData {
     chunkData;
     segments;
+    UPDATES = 0;
     constructor(chunkData) {
         this.chunkData = chunkData;
-        this.update();
     }
-    // Not very efficient right now
-    update() {
+    static cullDirections = [
+        new ImmutableVector3D(-1, 0, 0),
+        new ImmutableVector3D(1, 0, 0),
+        new ImmutableVector3D(0, -1, 0),
+        new ImmutableVector3D(0, 1, 0),
+        new ImmutableVector3D(0, 0, -1),
+        new ImmutableVector3D(0, 0, 1)
+    ];
+    canCull(position) {
+        for (const direction of InstancedData.cullDirections) {
+            const neighbor = position.clone().add(direction);
+            if (ChunkDataReferencer.isOutOfBounds(neighbor)) {
+                return false;
+            }
+            const block = this.chunkData.getBlock(new BlockPosition(neighbor, this.chunkData));
+            const model = block.getBlockModel(new BlockPosition(neighbor, this.chunkData));
+            if (model == null || model.isTransparent()) {
+                return false;
+            }
+        }
+        return true;
+    }
+    initial() {
         this.segments = [];
         let lastType = null;
         let lastSegment = null;
@@ -2962,34 +3948,129 @@ class InstancedData {
             const blockPrototype = this.chunkData.getBlock(position);
             const blockPosition = new BlockPosition(position, this.chunkData);
             const model = blockPrototype.getBlockModel(blockPosition);
+            if (model == null || this.canCull(position)) {
+                lastSegment = null;
+                lastType = null;
+                continue;
+            }
             if (model != lastType) {
-                lastSegment = new InstancedDataSegment(model, 0, i);
+                lastSegment = new InstancedDataSegment(model, 1, i);
                 this.segments.push(lastSegment);
                 lastType = model;
             }
-            const segment = lastSegment;
-            segment.setSize(segment.getSize() + 1);
+            else if (lastSegment && model == lastType) {
+                lastSegment.setSize(lastSegment.getSize() + 1);
+            }
         }
     }
+    // Not very efficient right now
+    update() {
+        if (!this.segments)
+            this.initial();
+        this.UPDATES++;
+        if (this.UPDATES > 1)
+            return;
+        let culls = 0;
+        let rendered = 0;
+        let empty = 0;
+        this.segments = [];
+        let lastType = null;
+        let lastSegment = null;
+        for (let i = 0; i < ChunkDataReferencer.cells; i++) {
+            const position = ChunkDataReferencer.position(i);
+            const blockPrototype = this.chunkData.getBlock(position);
+            const blockPosition = new BlockPosition(position, this.chunkData);
+            const model = blockPrototype.getBlockModel(blockPosition);
+            if (model == null || this.canCull(position)) {
+                lastSegment = null;
+                lastType = null;
+                if (model)
+                    culls++;
+                else
+                    empty++;
+                continue;
+            }
+            if (model != lastType) {
+                lastSegment = new InstancedDataSegment(model, 1, i);
+                this.segments.push(lastSegment);
+                lastType = model;
+            }
+            else if (lastSegment && model == lastType) {
+                lastSegment.setSize(lastSegment.getSize() + 1);
+            }
+            rendered++;
+        }
+        {
+            this.verifyCalls();
+        }
+        {
+            console.log(`Culled ${culls} blocks\nRendered ${rendered} blocks\n${empty} blocks without models\nof ${culls + rendered + empty}/${ChunkDataReferencer.cells} total blocks`);
+        }
+    }
+    verifyCalls() {
+        for (let i = 0; i < this.segments.length; i++) {
+            const segment = this.segments[i];
+            if (segment.getModel() == null) {
+                console.log(this.segments);
+                throw new Error(`Segment ${i} has a null model`);
+            }
+            if (segment.getSize() == 0) {
+                throw new Error(`Segment ${i} has a size of 0`);
+            }
+            if (segment.getStartIndex() + segment.getSize() > ChunkDataReferencer.cells) {
+                console.group("Instanced data verification");
+                console.error(`Segment ${i} goes out of bounds`);
+                console.log(`Start index: ${segment.getStartIndex()}`);
+                console.log(`Size: ${segment.getSize()}`);
+                console.log(`End index: ${segment.getStartIndex() + segment.getSize()}`);
+                console.log(`Chunk size: ${ChunkDataReferencer.cells}`);
+                console.groupEnd();
+            }
+            let blockPosition = new BlockPosition(ChunkDataReferencer.position(segment.getStartIndex()), this.chunkData);
+            let actualModel = this.chunkData.getBlock(blockPosition).getBlockModel(blockPosition);
+            if (actualModel != segment.getModel()) {
+                console.group("Instanced data verification");
+                console.error(`Segment ${i} has a different model than the actual block`);
+                console.groupEnd();
+                continue;
+            }
+            for (let j = 1; j < segment.getSize(); j++) {
+                blockPosition = new BlockPosition(ChunkDataReferencer.position(segment.getStartIndex() + j), this.chunkData);
+                actualModel = this.chunkData.getBlock(blockPosition).getBlockModel(blockPosition);
+                if (actualModel != segment.getModel()) {
+                    console.group("Instanced data verification");
+                    console.error(`Segment ${i} has a different model than the actual block`);
+                    console.log(`Block at ${blockPosition.getLocalPosition()} has model ${actualModel?.getRegisteredName()}`);
+                    console.log(`Segment model is ${segment.getModel()?.getRegisteredName()}`);
+                    console.groupEnd();
+                    break;
+                }
+            }
+        }
+    }
+    static VERIFY_CALLS = true;
+    static LOG_CULLING = true;
 }
 
 class WebGPUInstancedData extends InstancedData {
     assembledMesh;
     indirectCalls;
+    callCount;
     constructor(assembledMesh, chunkData) {
         super(chunkData);
         this.assembledMesh = assembledMesh;
-        this.indirectCalls = new ArrayBuffer(ChunkDataReferencer.cells * 16);
+        this.indirectCalls = new Uint32Array(ChunkDataReferencer.cells * 4);
     }
     update() {
         super.update();
-        const indirectCalls = new Uint32Array(this.indirectCalls);
-        for (let i = 0; i < this.indirectCalls.byteLength / 16; i++) {
+        this.callCount = this.segments.length;
+        for (let i = 0; i < this.indirectCalls.length / 4; i++) {
+            let startIndex = i * 4;
             if (i >= this.segments.length) {
-                indirectCalls[i * 4] = 0;
-                indirectCalls[i * 4 + 1] = 0;
-                indirectCalls[i * 4 + 2] = 0;
-                indirectCalls[i * 4 + 3] = 0;
+                this.indirectCalls[startIndex + 0] = 0;
+                this.indirectCalls[i * 4 + 1] = 0;
+                this.indirectCalls[i * 4 + 2] = 0;
+                this.indirectCalls[i * 4 + 3] = 0;
                 continue;
             }
             const segment = this.segments[i];
@@ -3001,14 +4082,17 @@ class WebGPUInstancedData extends InstancedData {
             const vertexCount = vertexEndIndex - vertexStartIndex;
             const instanceStartIndex = segment.getStartIndex();
             const instanceCount = segment.getSize();
-            indirectCalls[i * 4] = vertexCount;
-            indirectCalls[i * 4 + 1] = instanceCount;
-            indirectCalls[i * 4 + 2] = vertexStartIndex;
-            indirectCalls[i * 4 + 3] = instanceStartIndex;
+            this.indirectCalls[startIndex] = vertexCount;
+            this.indirectCalls[startIndex + 1] = instanceCount;
+            this.indirectCalls[startIndex + 2] = vertexStartIndex;
+            this.indirectCalls[startIndex + 3] = instanceStartIndex;
         }
     }
     getIndirectCalls() {
-        return this.indirectCalls;
+        return this.indirectCalls.buffer;
+    }
+    getCallCount() {
+        return this.callCount;
     }
 }
 
@@ -3026,8 +4110,14 @@ class WebGPUChunkMirror {
     getIndirectDrawCalls() {
         return this.instancedData.getIndirectCalls();
     }
+    getIndirectCallCount() {
+        return this.instancedData.getCallCount();
+    }
     getPosition() {
         return this.position;
+    }
+    update() {
+        this.instancedData.update();
     }
 }
 
@@ -3054,6 +4144,12 @@ class WebGPUWorldMirror extends RenderWorldMirror {
     createRenderChunkMirror(position) {
         return new WebGPUChunkMirror(position, this);
     }
+    updateRenderedWorld() {
+        super.updateRenderedWorld();
+        for (const chunk of this.getChunks()) {
+            chunk.update();
+        }
+    }
     getTerrainMesh() {
         return this.terrainMesh;
     }
@@ -3072,9 +4168,10 @@ class WebGPURenderer {
     renderedWorld;
     passes;
     bindGroupManager;
+    depthTexture;
     camera;
     perspective;
-    projector = new Projector(75, 1, 0.1, 1000);
+    projector = new Projector(Math.PI / 180 * 75, 1, 0.1, 1000);
     constructor(renderer) {
         this.renderer = renderer;
         this.renderedWorld = new WebGPUWorldMirror(this);
@@ -3086,6 +4183,9 @@ class WebGPURenderer {
             new ClearRenderPass(new Color(0, 0.1, 0.2, 1)),
             terrainRenderPass
         ];
+    }
+    getDepthTexture() {
+        return this.depthTexture;
     }
     getCanvas() {
         return this.device.getCanvas();
@@ -3104,8 +4204,12 @@ class WebGPURenderer {
     async setupWorldRenderer() {
         await this.device.setup();
         this.camera = new Camera();
+        this.camera.setProjector(this.projector);
         await this.camera.setup(this.device);
+        this.camera.update(this.device);
         this.bindGroupManager.addBindGroup(this.camera.getCameraBindGroup());
+        this.depthTexture = new DepthTexture();
+        await this.depthTexture.setup(this.device);
         await this.renderedWorld.setup(this.device);
         for (const pass of this.passes) {
             await pass.setupBindings(this.device);
@@ -3115,33 +4219,32 @@ class WebGPURenderer {
             await pass.setup(this.device);
         }
     }
-    render() {
+    async render() {
         const canvas = this.device.getCanvas();
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         this.projector.setAspectRatio(canvas.width / canvas.height);
         this.perspective.updatePerspective();
+        this.camera.update(this.device);
+        await this.depthTexture.resize(canvas.width, canvas.height);
         this.renderedWorld.updateRenderedWorld();
-        const gpuDevice = this.device.getDevice();
-        const commandEncoder = gpuDevice.createCommandEncoder({
-            label: "Renderer Command Encoder"
-        });
         for (const renderPass of this.passes) {
-            renderPass.render(commandEncoder);
+            await renderPass.render();
         }
-        this.device.getDevice().queue.submit([commandEncoder.finish()]);
     }
     getPerspective() {
         return this.perspective;
     }
     setPerspective(perspective) {
         this.perspective = perspective;
+        this.camera.setPerspective(perspective);
     }
     getProjector() {
         return this.projector;
     }
     setProjector(projector) {
         this.projector = projector;
+        this.camera.setProjector(projector);
     }
     getCamera() {
         return this.camera;
@@ -3185,24 +4288,57 @@ class Renderer {
         this.worldRenderer.setWorld(this.world);
         await this.worldRenderer.setupWorldRenderer();
     }
-    render() {
+    async render() {
         if (!this.worldRenderer)
             throw new Error('No world renderer set');
-        this.worldRenderer.render();
+        await this.worldRenderer.render();
     }
 }
 
-class EntityPerspective {
+class OrbitPerspective {
     entity;
+    clock;
     matrix;
-    constructor(entity) {
+    location;
+    rotation;
+    chunkLocation;
+    constructor(entity, clock) {
         this.entity = entity;
+        this.clock = clock;
     }
-    getChunkLocation() {
+    computeLocation() {
+        let location = this.entity.getPosition().mutable();
+        let time = this.clock.getTime();
+        let offsetX = Math.sin(time / 1000) * 16;
+        let offsetY = Math.sin(time / 1000) * 8;
+        let offsetZ = Math.cos(time / 1000) * 16;
+        location.x += offsetX;
+        location.y += offsetY;
+        location.z += offsetZ;
+        this.location = location;
+    }
+    computeRotation() {
+        let rotation = this.entity.getRotation().clone();
+        rotation.yaw = this.clock.getTime() / 1000 % (Math.PI * 2);
+        rotation.pitch = Math.PI * -0.25;
+        this.rotation = rotation;
+    }
+    computeTransformationMatrix() {
+        let matrix = new Matrix4();
+        matrix.multiply(Matrix4.createTranslation(this.location));
+        matrix.multiply(Matrix4.createRotation(this.rotation));
+        this.matrix = matrix;
+    }
+    computeChunkLocation() {
         if (!this.entity.getParentChunk()) {
             throw new Error("Cannot get chunk location of unbound entity");
         }
-        return this.entity.getParentChunk().getPosition();
+        const chunkX = Math.floor(this.location.x / ChunkDataReferencer.dimensions.x);
+        const chunkZ = Math.floor(this.location.z / ChunkDataReferencer.dimensions.z);
+        this.chunkLocation = new ImmutableVector2D(chunkX, chunkZ);
+    }
+    getChunkLocation() {
+        return this.chunkLocation;
     }
     getTransformationMatrix() {
         return this.matrix;
@@ -3211,29 +4347,10 @@ class EntityPerspective {
         return 10;
     }
     updatePerspective() {
-        this.matrix = this.computeTransformationMatrix();
-    }
-    computeTransformationMatrix() {
-        let matrix = new Matrix4();
-        matrix.multiply(Matrix4.createTranslation(this.entity.getPosition()));
-        matrix.multiply(Matrix4.createRotation(this.entity.getRotation()));
-        return matrix;
-    }
-}
-
-class SimpleWorldGenerator {
-    async generateChunk(location) {
-        const data = new ChunkData();
-        const stone = Registries.blocks.get('stone');
-        if (!stone) {
-            throw new Error('Stone block prototype not found');
-        }
-        for (let x = 0; x < ChunkDataReferencer.dimensions.x; x++) {
-            for (let z = 0; z < ChunkDataReferencer.dimensions.z; z++) {
-                data.setBlock(x, 0, z, stone);
-            }
-        }
-        return data;
+        this.computeLocation();
+        this.computeRotation();
+        this.computeChunkLocation();
+        this.computeTransformationMatrix();
     }
 }
 
@@ -3257,11 +4374,13 @@ class Client extends Game {
     renderer;
     worldGenerator;
     worldLoader;
+    clockViewer;
     constructor() {
         super();
         this.worldGenerator = new SimpleWorldGenerator();
         this.worldLoader = new SingleplayerWorldLoader(this.worldGenerator);
         this.getWorld().bindWorldLoader(this.worldLoader);
+        this.clockViewer = new EventClockViewer(this.getClock());
         this.renderer = new Renderer(this.getWorld());
     }
     getRenderer() {
@@ -3273,13 +4392,22 @@ class Client extends Game {
     async start() {
         await super.start();
         await this.renderer.setupRenderer();
+        const world = this.getWorld();
         const playerPrototype = Registries.entities.get('player');
         const playerEntity = playerPrototype.createEntity();
-        this.getWorld().addEntity(playerEntity);
-        const playerPerspective = new EntityPerspective(playerEntity);
+        world.addEntity(playerEntity);
+        playerEntity.setPosition(8, ChunkDataReferencer.dimensions.y, 8);
+        const playerPerspective = new OrbitPerspective(playerEntity, this.getClock());
         this.getRenderer().getWorldRenderer().setPerspective(playerPerspective);
+        for (let x = -4; x <= 4; x++) {
+            for (let z = -4; z <= 4; z++) {
+                world.loadChunk(x, z);
+            }
+        }
         const clock = this.getClock();
-        clock.schedule(() => this.renderer.render());
+        clock.schedule("tickWorld", async () => await this.getWorld().tick(clock.getDelta()));
+        clock.schedule("render", async () => await this.renderer.render());
+        clock.schedule("displayClockInfo", () => this.clockViewer.update());
         clock.start();
     }
 }

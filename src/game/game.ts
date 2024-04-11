@@ -22,10 +22,11 @@ export abstract class Game {
         Registries.fields.register('blockId', new ChunkDataNumberAllocation('u16'));
 
         await loadGameContent();
+        await Registries.blocks.setup();
+        await Registries.textures.setup();
+        await Registries.blockModels.setup();
 
-        Registries.blocks.allocate();
-        Registries.textures.allocate();
-        Registries.blocks.allocate();
+        //await new Promise(resolve => setTimeout(resolve, 10000));
     }
     
     abstract getRuntimeType(): GameRuntimeType;

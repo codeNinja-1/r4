@@ -1,6 +1,8 @@
 import { Orientation } from "../../../../../utils/rotation/orientation.js";
+import { ImmutableVector2D } from "../../../../../utils/vector2d/immutable-vector2d.js";
 import { Vector2D } from "../../../../../utils/vector2d/vector2d.js";
 import { ImmutableVector3D } from "../../../../../utils/vector3d/immutable-vector3d.js";
+import { Vector3D } from "../../../../../utils/vector3d/vector3d.js";
 import { Texture } from "../../../../utils/texture.js";
 import { PositionedModelComponent } from "./positioned-model-component.js";
 
@@ -20,11 +22,11 @@ export class PlaneModelComponent extends PositionedModelComponent {
     }
 
     getVertexPositions(): Float32Array {
-        return PlaneModelComponent.makePlaneVertices(this.orientation, this.width, this.height);
+        return PlaneModelComponent.makePlaneVertices(this.orientation, this.width, this.height, this.getPosition());
     }
 
-    getTextureMappings(): Uint32Array {
-        const data = new Uint32Array(PlaneModelComponent.baseTextureMapping.length);
+    getTextureMappings(): Float32Array {
+        const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
         const width = this.texture.getTextureWidth();
         const height = this.texture.getTextureHeight();
 
@@ -45,45 +47,54 @@ export class PlaneModelComponent extends PositionedModelComponent {
         ]);
     }
 
-    private static makePlaneVertices(orientation: Orientation, width: number, height: number) {
-        const vertices = PlaneModelComponent.baseGeometry.map(x => x);
+    private static orientPlaneVertex(orientation: Orientation, x: number, y: number): Vector3D {
+        if (orientation == Orientation.Up || orientation == Orientation.Down) {
+            return new ImmutableVector3D(x, 0, y);
+        } else if (orientation == Orientation.North || orientation == Orientation.South) {
+            return new ImmutableVector3D(x, y, 0);
+        } else if (orientation == Orientation.East || orientation == Orientation.West) {
+            return new ImmutableVector3D(0, x, y);
+        } else {
+            throw new Error("Invalid orientation");
+        }
+    }
 
-        for (let i = 0; i < vertices.length / 3; i++) {
-            const vector = new ImmutableVector3D(
-                vertices[i * 3] * width,
-                vertices[i * 3 + 1] * height,
-                vertices[i * 3 + 2]
+    private static makePlaneVertices(orientation: Orientation, width: number, height: number, position: Vector3D) {
+        const source = PlaneModelComponent.baseGeometry.map(x => x);
+        const vertices = new Float32Array(source.length / 2 * 3);
+
+        for (let i = 0; i < source.length / 2; i++) {
+            const vertex = PlaneModelComponent.orientPlaneVertex(
+                orientation,
+                source[i * 2] * width,
+                source[i * 2 + 1] * height
             );
 
-            const matrix = Orientation.getMatrix(orientation);
-
-            const result = matrix.multiply(vector);
-
-            vertices[i * 3] = result.x;
-            vertices[i * 3 + 1] = result.y;
-            vertices[i * 3 + 2] = result.z;
+            vertices[i * 3] = vertex.x + position.x;
+            vertices[i * 3 + 1] = vertex.y + position.y;
+            vertices[i * 3 + 2] = vertex.z + position.z;
         }
 
         return vertices;
     }
 
     private static baseTextureMapping = new Uint8Array([
-        0, 0,
-        1, 0,
         1, 1,
         1, 0,
-        0, 1,
-        0, 0
+        0, 0,
+        1, 1,
+        0, 0,
+        0, 1
     ]);
 
-    private static baseGeometry: Float32Array = PlaneModelComponent.getBaseGeometry();
+    private static baseGeometry: Float32Array = PlaneModelComponent.getBasePlaneGeometry();
 
-    private static getBaseGeometry() {
+    private static getBasePlaneGeometry() {
         const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
 
         for (let i = 0; i < PlaneModelComponent.baseTextureMapping.length / 2; i++) {
-            data[i] = PlaneModelComponent.baseTextureMapping[i * 2] - 0.5;
-            data[i + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] - 0.5;
+            data[i * 2] = PlaneModelComponent.baseTextureMapping[i * 2] - 0.5;
+            data[i * 2 + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] - 0.5;
         }
 
         return data;

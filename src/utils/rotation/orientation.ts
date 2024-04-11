@@ -16,12 +16,12 @@ export namespace Orientation {
 
     function calculateRotation(orientation: Orientation): Rotation {
         switch (orientation) {
-            case Orientation.North: return new Rotation(0, 0, 0);
-            case Orientation.East: return new Rotation(0, 90, 0);
-            case Orientation.South: return new Rotation(0, 180, 0);
-            case Orientation.West: return new Rotation(0, 270, 0);
-            case Orientation.Up: return new Rotation(-90, 0, 0);
-            case Orientation.Down: return new Rotation(90, 0, 0);
+            case Orientation.North: return Rotation.fromDegrees(0, 0, 0);
+            case Orientation.East: return Rotation.fromDegrees(0, 90, 0);
+            case Orientation.South: return Rotation.fromDegrees(0, 180, 0);
+            case Orientation.West: return Rotation.fromDegrees(0, 270, 0);
+            case Orientation.Up: return Rotation.fromDegrees(-90, 0, 0);
+            case Orientation.Down: return Rotation.fromDegrees(90, 0, 0);
         }
     }
 

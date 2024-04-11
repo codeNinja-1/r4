@@ -21,12 +21,7 @@ export namespace ChunkDataReferencer {
     /**
      * The dimensions of the chunk as a 3D vector.
      */
-    export const dimensions: Vector3D = new ImmutableVector3D(16, 32, 16);
-    
-    const shiftY: number = 8;
-    const shiftZ: number = 4;
-    const xBlock: number = 0b1111;
-    const zBlock: number = 0b1111;
+    export const dimensions: Vector3D = new ImmutableVector3D(16, 64, 16);
 
     /**
      * Returns the total number of cells in a chunk.
@@ -54,7 +49,7 @@ export namespace ChunkDataReferencer {
 
         if (x < 0 || x >= this.dimensions.x || y < 0 || y >= this.dimensions.y || z < 0 || z >= this.dimensions.z) throw new Error(`Coordinates are out of bounds`);
 
-        return x + (z << this.shiftZ) + (y << this.shiftY);
+        return x + (z << 4) + (y << 8);
     }
 
     /**
@@ -64,7 +59,7 @@ export namespace ChunkDataReferencer {
      * without creating a vector.
      */
     export function x(index: number): number {
-        return index & xBlock;
+        return index & 0b1111;
     }
 
     /**
@@ -74,7 +69,7 @@ export namespace ChunkDataReferencer {
      * without creating a vector.
      */
     export function y(index: number): number {
-        return index >> shiftY;
+        return index >> 8;
     }
 
     /**
@@ -84,7 +79,7 @@ export namespace ChunkDataReferencer {
      * without creating a vector.
      */
     export function z(index: number): number {
-        return index >> shiftZ & zBlock;
+        return (index >> 4) & 0b1111;
     }
 
     /**
@@ -97,6 +92,10 @@ export namespace ChunkDataReferencer {
      */
     export function position(index: number): Vector3D {
         return new MutableVector3D(this.x(index), this.y(index), this.z(index));
+    }
+
+    export function isOutOfBounds(position: Vector3D): boolean {
+        return position.x < 0 || position.x >= this.dimensions.x || position.y < 0 || position.y >= this.dimensions.y || position.z < 0 || position.z >= this.dimensions.z;
     }
 }
 

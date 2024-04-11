@@ -9,25 +9,23 @@ import { StaticModel } from "../model/static/static-model.js";
 export class MeshAssembler {
     private models: StaticModel[];
     private vertexPositions: Float32Array;
-    private textureMappings: Uint32Array;
+    private textureMappings: Float32Array;
     private texture: Texture;
-    private startIndex: Map<StaticModel, number>;
-    private endIndex: Map<StaticModel, number>;
+    private modelIndexes: Map<StaticModel, [ number, number ]>;
 
     constructor(models: Iterable<StaticModel>) {
         this.models = Array.from(models);
     }
 
-    assembleMeshes(): AssembledMesh {
-        if (this.texture) {
-            return this.createAssembledMesh();
+    private setupModelsAndIndexes() {
+        if (MeshAssembler.PRINT_OUTPUT) {
+            console.groupCollapsed("Models");
         }
 
-        this.startIndex = new Map();
-        this.endIndex = new Map();
+        this.modelIndexes = new Map();
 
         const modelVertexPositions: Float32Array[] = [];
-        const modelTextureMappings: Uint32Array[] = [];
+        const modelTextureMappings: Float32Array[] = [];
         const modelTextureIds: Uint32Array[] = [];
 
         let modelIndex = 0;
@@ -38,20 +36,68 @@ export class MeshAssembler {
             const textureMappings = model.getTextureMappings();
             const textureIds = model.getTextureIds();
 
-            this.startIndex.set(model, vertexIndex);
+            const startIndex = vertexIndex;
 
             modelVertexPositions.push(vertexPositions);
             modelTextureMappings.push(textureMappings);
             modelTextureIds.push(textureIds);
 
+            if (MeshAssembler.PRINT_OUTPUT) {
+                console.groupCollapsed(`Model ${modelIndex}: ${model.getRegisteredName()}`);
+
+                console.groupCollapsed("Vertex positions");
+                console.log(vertexPositions);
+                console.groupEnd();
+
+                console.groupCollapsed("Texture mappings");
+                console.log(textureMappings);
+                console.groupEnd();
+
+                console.groupCollapsed("Texture ids");
+                console.log(textureIds);
+                console.groupEnd();
+
+                console.groupEnd();
+            }
+
             vertexIndex += vertexPositions.length / 3;
 
-            this.endIndex.set(model, vertexIndex);
+            const endIndex = vertexIndex;
+
+            this.modelIndexes.set(model, [ startIndex, endIndex ]);
 
             modelIndex++;
         }
 
-        this.vertexPositions = new Float32Array(DataUtils.concat(modelVertexPositions));
+        if (MeshAssembler.PRINT_OUTPUT) {
+            console.groupEnd();
+        }
+
+        return {
+            modelGeometries: modelVertexPositions,
+            modelTextureMappings: modelTextureMappings,
+            modelTextureIds: modelTextureIds,
+            totalVertexCount: vertexIndex
+        }
+    }
+
+    assembleMeshes(): AssembledMesh {
+        if (this.texture) {
+            return this.createAssembledMesh();
+        }
+
+        if (MeshAssembler.PRINT_OUTPUT) {
+            console.groupCollapsed("Assembled mesh");
+        }
+
+        const {
+            modelGeometries,
+            modelTextureMappings,
+            modelTextureIds,
+            totalVertexCount
+        } = this.setupModelsAndIndexes();
+
+        this.vertexPositions = new Float32Array(DataUtils.concat(modelGeometries));
         
         const textureArray = this.getTextureArrayFromModelTextureIds(modelTextureIds);
         const combinedSize = this.getCombinedTextureSize(textureArray);
@@ -59,12 +105,15 @@ export class MeshAssembler {
         const { texturePositions, texture } = this.renderCombinedTextures(combinedSize, textureArray);
         this.texture = texture;
 
-        this.textureMappings = new Uint32Array(vertexIndex * 2);
+        this.textureMappings = new Float32Array(totalVertexCount * 2);
 
         for (let modelIndex = 0; modelIndex < modelTextureIds.length; modelIndex++) {
+            const modelIndexes = this.modelIndexes.get(this.models[modelIndex]);
+
+            if (!modelIndexes) throw new Error(`Geometry indexing error with model ${modelIndex}`);
+
             const textureIds = modelTextureIds[modelIndex];
             const textureMappings = modelTextureMappings[modelIndex];
-            const vertexStart = this.startIndex[modelIndex];
             
             for (let triangleIndex = 0; triangleIndex < textureIds.length; triangleIndex++) {
                 const textureId = textureIds[triangleIndex];
@@ -72,19 +121,31 @@ export class MeshAssembler {
                 const texturePosition = texturePositions[textureIndex];
 
                 for (let vertexIndex = 0; vertexIndex < 3; vertexIndex++) {
-                    const vertexPosition = vertexStart + triangleIndex * 3 + vertexIndex;
+                    const modelOffset = modelIndexes[0];
+                    const offset = (triangleIndex * 3 + vertexIndex) * 2;
 
-                    this.textureMappings[vertexPosition * 2] = textureMappings[triangleIndex * 2] + texturePosition;
-                    this.textureMappings[vertexPosition * 2 + 1] = textureMappings[triangleIndex * 2 + 1];
+                    this.textureMappings[modelOffset * 2 + offset] = (textureMappings[offset] + texturePosition) / combinedSize.x;
+                    this.textureMappings[modelOffset * 2 + offset + 1] = (textureMappings[offset + 1]) / combinedSize.y;
                 }
             }
+        }
+
+        if (MeshAssembler.PRINT_OUTPUT) {
+            console.groupCollapsed("Vertex positions");
+            console.log(this.vertexPositions);
+            console.groupEnd();
+            console.groupCollapsed("Texture mappings")
+            console.log(this.textureMappings);
+            console.groupEnd();
+            console.log("%cTexture has been added to the bottom of the document", "font-style: italic;");
+            console.groupEnd();
         }
 
         return this.createAssembledMesh();
     }
 
     private createAssembledMesh(): AssembledMesh {
-        return new AssembledMesh(this.vertexPositions, this.textureMappings, this.texture, this.startIndex, this.endIndex);
+        return new AssembledMesh(this.vertexPositions, this.textureMappings, this.texture, this.modelIndexes);
     }
 
     private getTextureArrayFromModelTextureIds(modelTextureIds: Uint32Array[]): Texture[] {
@@ -140,20 +201,23 @@ export class MeshAssembler {
             textureIndex++;
         }
 
-        canvas.convertToBlob().then(blob => {
-            const url = URL.createObjectURL(blob);
-
-            const img = new Image();
-            img.onload = () => {
-                URL.revokeObjectURL(url);
-            };
-
-            img.src = url;
-            document.body.appendChild(img);
-        });
+        if (MeshAssembler.PRINT_OUTPUT) {
+            canvas.convertToBlob().then(blob => {
+                const url = URL.createObjectURL(blob);
+    
+                const img = new Image();
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                };
+    
+                img.src = url;
+            });
+        }
 
         const texture = Texture.fromImageData(context.getImageData(0, 0, size.x, size.y));
 
         return { texturePositions, texture };
     }
+
+    private static PRINT_OUTPUT = true;
 }

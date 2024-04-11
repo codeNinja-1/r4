@@ -93,10 +93,10 @@ export abstract class BaseEntity implements Entity {
         return this.chunk;
     }
 
-    tickEntity(delta: number): void {
+    async tickEntity(delta: number): Promise<void> {
     }
 
-    getPosition(): Vector3D {
+    getPosition(): HandleableVector3D {
         return this.position;
     }
 

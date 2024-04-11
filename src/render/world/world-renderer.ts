@@ -17,6 +17,5 @@ export interface WorldRenderer {
     setWorld(world: World): void;
 
     setupWorldRenderer(): Promise<void>;
-
-    render(): void;
+    render(): Promise<void>;
 }

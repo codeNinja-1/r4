@@ -4,10 +4,9 @@ import { StaticModel } from "../model/static/static-model.js";
 export class AssembledMesh {
     constructor(
         private vertexPositions: Float32Array,
-        private textureMappings: Uint32Array,
+        private textureMappings: Float32Array,
         private texture: Texture,
-        private startIndex: Map<StaticModel, number>,
-        private endIndex: Map<StaticModel, number>
+        private indexes: Map<StaticModel, [ number, number ]>
     ) {
     }
 
@@ -15,7 +14,7 @@ export class AssembledMesh {
         return this.vertexPositions;
     }
 
-    getTextureMappings(): Uint32Array {
+    getTextureMappings(): Float32Array {
         return this.textureMappings;
     }
 
@@ -24,14 +23,14 @@ export class AssembledMesh {
     }
 
     getModelStartIndex(model: StaticModel): number {
-        if (!this.startIndex.has(model)) throw new Error('Model not found in mesh assembler');
+        if (!this.indexes.has(model)) throw new Error('Model not found in mesh assembler');
 
-        return this.startIndex.get(model)!;
+        return this.indexes.get(model)![0];
     }
 
     getModelEndIndex(model: StaticModel): number {
-        if (!this.endIndex.has(model)) throw new Error('Model not found in mesh assembler');
+        if (!this.indexes.has(model)) throw new Error('Model not found in mesh assembler');
 
-        return this.endIndex.get(model)!;
+        return this.indexes.get(model)![1];
     }
 }

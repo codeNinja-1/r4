@@ -1,3 +1,4 @@
+import { ImmutableVector3D } from "../../utils/vector3d/immutable-vector3d.js";
 import { Entity } from "../../world/entity/entity.js";
 
 export namespace EntityPhysics {
@@ -5,10 +6,10 @@ export namespace EntityPhysics {
         const state = entity.getPhysicalState()!;
         const properties = entity.getPhysicalProperties()!;
 
-        state.velocity.y -= properties.gravity * delta;
+        state.applyForce(new ImmutableVector3D(0, properties.gravity * delta, 0));
     }
     
-    function isOnGround(entity: Entity) {
+    export function isOnGround(entity: Entity) {
         return false;
     }
 
@@ -17,12 +18,17 @@ export namespace EntityPhysics {
         const properties = entity.getPhysicalProperties()!;
 
         if (isOnGround(entity)) {
-            state.velocity.x *= properties.friction.ground;
-            state.velocity.z *= properties.friction.ground;
+            state.applyFriction(new ImmutableVector3D(
+                properties.friction.ground,
+                0,
+                properties.friction.ground
+            ));
         } else {
-            state.velocity.x *= properties.friction.air;
-            state.velocity.y *= properties.friction.air;
-            state.velocity.z *= properties.friction.air;
+            state.applyFriction(new ImmutableVector3D(
+                properties.friction.air,
+                properties.friction.air,
+                properties.friction.air
+            ));
         }
     }
 
@@ -30,7 +36,7 @@ export namespace EntityPhysics {
         const state = entity.getPhysicalState()!;
 
         const position = entity.getPosition();
-        const velocity = state.velocity;
+        const velocity = state.getVelocity();
 
         position.x += velocity.x * delta;
         position.y += velocity.y * delta;

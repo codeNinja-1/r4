@@ -1,17 +1,17 @@
 import { Texture } from "../../../../utils/texture.js";
 import { BindGroupEntry } from "./bind-group-entry.js";
 import { GraphicsDevice } from "../graphics-device.js";
+import { BaseBindGroupEntry } from "./base-bind-group-entry.js";
 
-export class WebGPUTexture implements BindGroupEntry {
-    private texture: GPUTexture | null;
-    private device: GraphicsDevice;
-    private binding: number;
+export class WebGPUTexture extends BaseBindGroupEntry {
+    private texture: GPUTexture | null = null;
 
     constructor(private source: Texture) {
+        super();
     }
 
-    setBinding(index: number): void {
-        this.binding = index;
+    getLabel(): string {
+        return super.getLabel("Texture");
     }
     
     getLayoutEntry(): GPUBindGroupLayoutEntry {
@@ -32,7 +32,7 @@ export class WebGPUTexture implements BindGroupEntry {
 
         return {
             binding: this.binding,
-            resource: this.texture.createView()
+            resource: this.texture.createView({ label: this.getLabel() + ' [View]'})
         };
     }
 
@@ -44,10 +44,13 @@ export class WebGPUTexture implements BindGroupEntry {
         return this.texture;
     }
 
+    getBinding(): number {
+        return this.binding;
+    }
+
     async setup(device: GraphicsDevice) {
-        this.device = device;
-        
         this.texture = device.getDevice().createTexture({
+            label: this.label,
             size: [
                 this.source.getTextureWidth(),
                 this.source.getTextureHeight()

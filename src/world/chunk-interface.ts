@@ -14,7 +14,7 @@ export abstract class ChunkInterface {
 
     unloadChunk() {}
     setupChunk() {}
-    tickChunk() {}
+    async tickChunk() {}
 }
 
 export namespace ChunkInterface {

@@ -10,12 +10,10 @@ import { ChunkDataReferencer } from "./chunk-data-referencer.js";
 
 export class ChunkData {
     private chunk: ChunkInterface.NonPlaceholder | null = null;
-    private fields: Map<string, ChunkDataField<any>>;
     private entities: Set<Entity> = new Set();
     private updates: Set<number> = new Set();
 
-    constructor() {
-        this.fields = ChunkDataFields.initialize();
+    constructor(private fields: Map<string, ChunkDataField<any>> = ChunkDataFields.initialize()) {
     }
 
     setParentChunk(chunk: ChunkInterface.NonPlaceholder): void {
@@ -52,7 +50,7 @@ export class ChunkData {
     getBlockId(index: number): number;
     getBlockId(x: BlockPosition | Vector3D | number, y?: number, z?: number): number {
         if (x instanceof BlockPosition) {
-            return this.getField('blockId').get(x.getGlobalPosition());
+            return this.getField('blockId').get(x.getLocalPosition());
         } else if (x instanceof Vector3D) {
             return this.getField('blockId').get(x);
         } else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
@@ -70,13 +68,13 @@ export class ChunkData {
     getBlock(index: number): BlockPrototype;
     getBlock(x: BlockPosition | Vector3D | number, y?: number, z?: number): BlockPrototype {
         if (x instanceof BlockPosition) {
-            return Registries.blocks.get(this.getBlockId(x)) as BlockPrototype;
+            return Registries.blocks.get(this.getBlockId(x))!;
         } else if (x instanceof Vector3D) {
-            return Registries.blocks.get(this.getBlockId(x)) as BlockPrototype;
+            return Registries.blocks.get(this.getBlockId(x))!;
         } else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
-            return Registries.blocks.get(this.getBlockId(x, y, z)) as BlockPrototype;
+            return Registries.blocks.get(this.getBlockId(x, y, z))!;
         } else if (typeof x === 'number') {
-            return Registries.blocks.get(this.getBlockId(x)) as BlockPrototype; 
+            return Registries.blocks.get(this.getBlockId(x))!; 
         } else {
             throw new Error("Invalid arguments");
         }
@@ -129,7 +127,7 @@ export class ChunkData {
         return this.updates;
     }
 
-    tickChunkData(): void {
+    async tickChunkData(): Promise<void> {
         for (const update of this.updates) {
             const position = ChunkDataReferencer.position(update);
             const blockPrototype = this.getBlock(position);

@@ -20,6 +20,10 @@ export class InstancedDataSegment {
         return this.model;
     }
 
+    setModel(model: BlockModel | null): void {
+        this.model = model;
+    }
+
     getStartIndex(): number {
         return this.startIndex;
     }

@@ -9,16 +9,17 @@ export class GroupModelComponent extends PositionedModelComponent {
         const components = Array.from(this.components);
         const positions = components.map(component => component.getVertexPositions(parentPosition));
         const buffer = DataUtils.concat(positions);
+        const array = new Float32Array(buffer);
 
-        return new Float32Array(buffer);
+        return array;
     }
 
-    getTextureMappings(): Uint32Array {
+    getTextureMappings(): Float32Array {
         const components = Array.from(this.components);
         const textureMappings = components.map(component => component.getTextureMappings());
         const buffer = DataUtils.concat(textureMappings);
 
-        return new Uint32Array(buffer);
+        return new Float32Array(buffer);
     }
 
     getTextureIds(): Uint32Array {

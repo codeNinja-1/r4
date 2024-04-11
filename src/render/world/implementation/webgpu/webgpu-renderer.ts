@@ -5,8 +5,8 @@ import { Perspective } from "../../pespective/perspective.js";
 import { Projector } from "../../pespective/projector.js";
 import { WorldRenderer } from "../../world-renderer.js";
 import { BindGroupManager } from "./bindings/bind-group-manager.js";
-import { BufferBindGroupEntry } from "./bindings/buffer-bind-group-entry.js";
 import { Camera } from "./camera.js";
+import { DepthTexture } from "./depth-texture.js";
 import { GraphicsDevice } from "./graphics-device.js";
 import { ClearRenderPass } from "./pass/clear-render-pass.js";
 import { RenderPass } from "./pass/render-pass.js";
@@ -20,9 +20,11 @@ export class WebGPURenderer implements WorldRenderer {
     private passes: RenderPass[];
     private bindGroupManager: BindGroupManager;
 
+    private depthTexture: DepthTexture;
+
     private camera: Camera;
     private perspective: Perspective;
-    private projector: Projector = new Projector(75, 1, 0.1, 1000);
+    private projector: Projector = new Projector(Math.PI / 180 * 75, 1, 0.1, 1000);
 
     constructor(private renderer: Renderer) {
         this.renderedWorld = new WebGPUWorldMirror(this);
@@ -37,6 +39,10 @@ export class WebGPURenderer implements WorldRenderer {
             new ClearRenderPass(new Color(0, 0.1, 0.2, 1)),
             terrainRenderPass
         ];
+    }
+
+    getDepthTexture(): DepthTexture {
+        return this.depthTexture;
     }
 
     getCanvas(): HTMLCanvasElement {
@@ -61,8 +67,13 @@ export class WebGPURenderer implements WorldRenderer {
         await this.device.setup();
 
         this.camera = new Camera();
+        this.camera.setProjector(this.projector);
         await this.camera.setup(this.device);
+        this.camera.update(this.device);
         this.bindGroupManager.addBindGroup(this.camera.getCameraBindGroup());
+
+        this.depthTexture = new DepthTexture();
+        await this.depthTexture.setup(this.device);
 
         await this.renderedWorld.setup(this.device);
 
@@ -77,27 +88,22 @@ export class WebGPURenderer implements WorldRenderer {
         }
     }
 
-    render(): void {
+    async render(): Promise<void> {
         const canvas = this.device.getCanvas();
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         this.projector.setAspectRatio(canvas.width / canvas.height);
-
         this.perspective.updatePerspective();
+        this.camera.update(this.device);
+
+        await this.depthTexture.resize(canvas.width, canvas.height);
+
         this.renderedWorld.updateRenderedWorld();
 
-        const gpuDevice = this.device.getDevice();
-
-        const commandEncoder = gpuDevice.createCommandEncoder({
-            label: "Renderer Command Encoder"
-        });
-        
         for (const renderPass of this.passes) {
-            renderPass.render(commandEncoder);
+            await renderPass.render();
         }
-
-        this.device.getDevice().queue.submit([ commandEncoder.finish() ]);
     }
 
     getPerspective(): Perspective {
@@ -106,6 +112,8 @@ export class WebGPURenderer implements WorldRenderer {
 
     setPerspective(perspective: Perspective): void {
         this.perspective = perspective;
+
+        this.camera.setPerspective(perspective);
     }
 
     getProjector(): Projector {
@@ -114,6 +122,8 @@ export class WebGPURenderer implements WorldRenderer {
 
     setProjector(projector: Projector): void {
         this.projector = projector;
+
+        this.camera.setProjector(projector);
     }
 
     getCamera(): Camera {
