@@ -32,7 +32,7 @@ export class TerrainRenderPass extends BaseRenderPass {
 
         shader.setup(device);
 
-        this.addPrimitiveTopology("triangle-list");
+        this.addPrimitiveTopology("triangle-list", "front");
         this.addLabel("Terrain Render Pass");
         this.addVertexStage(shader, "vertex_main");
         this.addFragmentStage(shader, "fragment_main");
@@ -134,18 +134,14 @@ export class TerrainRenderPass extends BaseRenderPass {
         }
     }
 
-    private _draw(renderPass: GPURenderPassEncoder, gpuDevice: GPUDevice, buffer: ArrayBuffer, callsLength: number) {
-        if (!TerrainRenderPass.DISABLE_INDIRECT_DRAWING_FOR_DEBUGGING) {
-            let startIndex = buffer.byteLength - callsLength * 16;
-
-            gpuDevice.queue.writeBuffer(this.indirectDrawBuffer, startIndex, buffer, 0, callsLength * 16);
+    private _draw(renderPass: GPURenderPassEncoder, gpuDevice: GPUDevice, drawCalls: Uint32Array, callsLength: number) {
+        if (!TerrainRenderPass.DISABLE_INDIRECT_DRAWING) {
+            gpuDevice.queue.writeBuffer(this.indirectDrawBuffer, 0, drawCalls, 0, callsLength * 16);
 
             for (let i = 0; i < callsLength; i++) {
-                renderPass.drawIndirect(this.indirectDrawBuffer, startIndex + i * 16);
+                renderPass.drawIndirect(this.indirectDrawBuffer, 4 * 4 * i);
             }
         } else {
-            const drawCalls = new Uint32Array(buffer);
-
             for (let i = 0; i < drawCalls.length; i += 4) {
                 const vertexCount = drawCalls[i + 0];
                 const instanceCount = drawCalls[i + 1];
@@ -159,5 +155,5 @@ export class TerrainRenderPass extends BaseRenderPass {
         }
     }
 
-    private static DISABLE_INDIRECT_DRAWING_FOR_DEBUGGING = true;
+    private static DISABLE_INDIRECT_DRAWING = true;
 }

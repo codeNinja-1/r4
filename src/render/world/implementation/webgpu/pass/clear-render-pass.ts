@@ -22,14 +22,11 @@ export class ClearRenderPass implements RenderPass {
 
         const renderPassDescriptor: GPURenderPassDescriptor = {
             colorAttachments: [
-                {
+                this.device.getRenderer().getMultisampleTexture().addToAttachment({
                     clearValue: Color.toGPUColor(this.color),
                     loadOp: "clear",
-                    storeOp: "store",
-                    view: this.device.getContext().getCurrentTexture().createView({
-                        label: "Canvas Texture [View]"
-                    })
-                }
+                    storeOp: "store"
+                }) as GPURenderPassColorAttachment
             ],
             depthStencilAttachment: {
                 view: this.device.getRenderer().getDepthTexture().createView(),

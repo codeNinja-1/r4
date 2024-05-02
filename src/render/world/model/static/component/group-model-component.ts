@@ -1,13 +1,13 @@
 import { DataUtils } from "../../../../../utils/data-utils.js";
 import { Vector3D } from "../../../../../utils/vector3d/vector3d.js";
-import { PositionedModelComponent } from "./positioned-model-component.js";
+import { ModelComponent } from "../model-component.js";
 
-export class GroupModelComponent extends PositionedModelComponent {
-    private components: Set<PositionedModelComponent> = new Set();
+export class GroupModelComponent implements ModelComponent {
+    private components: Set<ModelComponent> = new Set();
 
-    getVertexPositions(parentPosition: Vector3D): Float32Array {
+    getVertexPositions(): Float32Array {
         const components = Array.from(this.components);
-        const positions = components.map(component => component.getVertexPositions(parentPosition));
+        const positions = components.map(component => component.getVertexPositions());
         const buffer = DataUtils.concat(positions);
         const array = new Float32Array(buffer);
 
@@ -30,13 +30,13 @@ export class GroupModelComponent extends PositionedModelComponent {
         return new Uint32Array(buffer);
     }
 
-    add(...components: PositionedModelComponent[]): void {
+    add(...components: ModelComponent[]): void {
         for (const component of components) {
             this.components.add(component);
         }
     }
 
-    remove(...components: PositionedModelComponent[]): void {
+    remove(...components: ModelComponent[]): void {
         for (const component of components) {
             this.components.delete(component);
         }

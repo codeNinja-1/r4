@@ -1,41 +1,27 @@
 import { Orientation } from "../../../../../utils/rotation/orientation.js";
-import { ImmutableVector2D } from "../../../../../utils/vector2d/immutable-vector2d.js";
 import { Vector2D } from "../../../../../utils/vector2d/vector2d.js";
 import { ImmutableVector3D } from "../../../../../utils/vector3d/immutable-vector3d.js";
 import { Vector3D } from "../../../../../utils/vector3d/vector3d.js";
 import { Texture } from "../../../../utils/texture.js";
-import { PositionedModelComponent } from "./positioned-model-component.js";
+import { ModelComponent } from "../model-component.js";
 
-export class PlaneModelComponent extends PositionedModelComponent {
+export class PlaneModelComponent implements ModelComponent {
     private width: number;
     private height: number;
-    private orientation: Orientation = Orientation.North;
     private texture: Texture;
 
-    constructor(texture: Texture, size: Vector2D, orientation: Orientation) {
-        super();
-        
+    constructor(texture: Texture, size: Vector2D) {
         this.width = size.x;
         this.height = size.y;
         this.texture = texture;
-        this.orientation = orientation;
     }
 
     getVertexPositions(): Float32Array {
-        return PlaneModelComponent.makePlaneVertices(this.orientation, this.width, this.height, this.getPosition());
+        return PlaneModelComponent.scaleGeometry(PlaneModelComponent.basePlaneGeometry, this.width, this.height);
     }
 
     getTextureMappings(): Float32Array {
-        const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
-        const width = this.texture.getTextureWidth();
-        const height = this.texture.getTextureHeight();
-
-        for (let i = 0; i < data.length / 2; i++) {
-            data[i * 2] = PlaneModelComponent.baseTextureMapping[i * 2] * width;
-            data[i * 2 + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] * height;
-        }
-
-        return data;
+        return PlaneModelComponent.scaleMapping(PlaneModelComponent.baseTextureMapping, this.width, this.height);
     }
     
     getTextureIds(): Uint32Array {
@@ -47,38 +33,40 @@ export class PlaneModelComponent extends PositionedModelComponent {
         ]);
     }
 
-    private static orientPlaneVertex(orientation: Orientation, x: number, y: number): Vector3D {
-        if (orientation == Orientation.Up || orientation == Orientation.Down) {
-            return new ImmutableVector3D(x, 0, y);
-        } else if (orientation == Orientation.North || orientation == Orientation.South) {
-            return new ImmutableVector3D(x, y, 0);
-        } else if (orientation == Orientation.East || orientation == Orientation.West) {
-            return new ImmutableVector3D(0, x, y);
-        } else {
-            throw new Error("Invalid orientation");
-        }
-    }
 
-    private static makePlaneVertices(orientation: Orientation, width: number, height: number, position: Vector3D) {
-        const source = PlaneModelComponent.baseGeometry.map(x => x);
-        const vertices = new Float32Array(source.length / 2 * 3);
+    private static scaleGeometry(geometry: Float32Array, width: number, height: number): Float32Array {
+        const data = new Float32Array(geometry.length);
 
-        for (let i = 0; i < source.length / 2; i++) {
-            const vertex = PlaneModelComponent.orientPlaneVertex(
-                orientation,
-                source[i * 2] * width,
-                source[i * 2 + 1] * height
-            );
-
-            vertices[i * 3] = vertex.x + position.x;
-            vertices[i * 3 + 1] = vertex.y + position.y;
-            vertices[i * 3 + 2] = vertex.z + position.z;
+        for (let i = 0; i < data.length / 3; i++) {
+            data[i * 3] = geometry[i * 3] * width;
+            data[i * 3 + 1] = geometry[i * 3 + 1] * height;
+            data[i * 3 + 2] = geometry[i * 3 + 2];
         }
 
-        return vertices;
+        return data;
     }
 
-    private static baseTextureMapping = new Uint8Array([
+    private static scaleMapping(mapping: Float32Array, width: number, height: number): Float32Array {
+        const data = new Float32Array(mapping.length);
+
+        for (let i = 0; i < data.length / 2; i++) {
+            data[i * 2] = mapping[i * 2] * width;
+            data[i * 2 + 1] = mapping[i * 2 + 1] * height;
+        }
+
+        return data;
+    }
+
+    private static basePlaneGeometry = new Float32Array([
+        1, 1, 0,
+        1, 0, 0,
+        0, 0, 0,
+        1, 1, 0,
+        0, 0, 0,
+        0, 1, 0
+    ]);
+
+    private static baseTextureMapping = new Float32Array([
         1, 1,
         1, 0,
         0, 0,
@@ -86,17 +74,4 @@ export class PlaneModelComponent extends PositionedModelComponent {
         0, 0,
         0, 1
     ]);
-
-    private static baseGeometry: Float32Array = PlaneModelComponent.getBasePlaneGeometry();
-
-    private static getBasePlaneGeometry() {
-        const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
-
-        for (let i = 0; i < PlaneModelComponent.baseTextureMapping.length / 2; i++) {
-            data[i * 2] = PlaneModelComponent.baseTextureMapping[i * 2] - 0.5;
-            data[i * 2 + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] - 0.5;
-        }
-
-        return data;
-    }
 }

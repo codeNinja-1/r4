@@ -1,6 +1,1 @@
-import mocha from 'mocha';
-
-mocha.describe('test', () => {
-    mocha.it('should pass', () => {
-    });
-});
+import "./tests/quaternion.js";

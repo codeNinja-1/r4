@@ -8,6 +8,7 @@ import { BindGroupManager } from "./bindings/bind-group-manager.js";
 import { Camera } from "./camera.js";
 import { DepthTexture } from "./depth-texture.js";
 import { GraphicsDevice } from "./graphics-device.js";
+import { MultisampleTexture } from "./multisample-texture.js";
 import { ClearRenderPass } from "./pass/clear-render-pass.js";
 import { RenderPass } from "./pass/render-pass.js";
 import { TerrainRenderPass } from "./pass/terrain-render-pass.js";
@@ -20,6 +21,7 @@ export class WebGPURenderer implements WorldRenderer {
     private passes: RenderPass[];
     private bindGroupManager: BindGroupManager;
 
+    private multisampleTexture: MultisampleTexture;
     private depthTexture: DepthTexture;
 
     private camera: Camera;
@@ -43,6 +45,10 @@ export class WebGPURenderer implements WorldRenderer {
 
     getDepthTexture(): DepthTexture {
         return this.depthTexture;
+    }
+
+    getMultisampleTexture(): MultisampleTexture {
+        return this.multisampleTexture;
     }
 
     getCanvas(): HTMLCanvasElement {
@@ -75,6 +81,9 @@ export class WebGPURenderer implements WorldRenderer {
         this.depthTexture = new DepthTexture();
         await this.depthTexture.setup(this.device);
 
+        this.multisampleTexture = new MultisampleTexture();
+        await this.multisampleTexture.setup(this.device);
+
         await this.renderedWorld.setup(this.device);
 
         for (const pass of this.passes) {
@@ -98,6 +107,7 @@ export class WebGPURenderer implements WorldRenderer {
         this.camera.update(this.device);
 
         await this.depthTexture.resize(canvas.width, canvas.height);
+        await this.multisampleTexture.resize(canvas.width, canvas.height);
 
         this.renderedWorld.updateRenderedWorld();
 

@@ -19,11 +19,13 @@ export abstract class BaseRenderPass implements RenderPass {
     async setup(device: GraphicsDevice) {
         const gpuDevice = device.getDevice();
 
+        this.descriptor.multisample = {
+            count: device.getRenderer().getMultisampleTexture().getSampleCount()
+        };
+
         const layoutDescriptor: Partial<GPUPipelineLayoutDescriptor> = {};
 
         this.bindGroupManager.addBindGroupsToPipelineLayout(layoutDescriptor);
-
-        console.log(layoutDescriptor);
 
         this.pipelineLayout = gpuDevice.createPipelineLayout(layoutDescriptor as GPUPipelineLayoutDescriptor);
 
@@ -86,11 +88,10 @@ export abstract class BaseRenderPass implements RenderPass {
     protected createRenderPass(commandEncoder: GPUCommandEncoder): GPURenderPassEncoder {
         const renderPassDescriptor: Partial<GPURenderPassDescriptor> = {
             colorAttachments: [
-                {
-                    view: this.device.getContext().getCurrentTexture().createView({ label: "Canvas Texture [View]" }),
+                this.device.getRenderer().getMultisampleTexture().addToAttachment({
                     loadOp: "load",
                     storeOp: "store"
-                }
+                }) as GPURenderPassColorAttachment
             ]
         };
 

@@ -13,17 +13,30 @@ export class OrbitPerspective implements Perspective {
     private location: Vector3D;
     private rotation: Rotation;
     private chunkLocation: Vector2D;
+    private mousePosition: Vector2D;
+    private distance: number = 64;
 
     constructor(private entity: Entity, private clock: EventClock) {
+        document.addEventListener('mousemove', event => {
+            if (event.shiftKey) {
+                this.distance = this.distance + event.movementY / 2;
+            } else {
+                this.mousePosition = new ImmutableVector2D(event.clientX, event.clientY);
+            }
+        });
+
+        this.mousePosition = new ImmutableVector2D();
     }
 
-    private computeLocation() {
+    private computeLocation(mousePosition: Vector2D) {
         let location = this.entity.getPosition().mutable();
-        let time = this.clock.getTime();
 
-        let offsetX = Math.sin(time / 1000) * 16;
-        let offsetY = Math.sin(time / 1000) * 8;
-        let offsetZ = Math.cos(time / 1000) * 16;
+        let angleX = -(mousePosition.x - window.innerWidth / 2) / window.innerWidth * 2 * Math.PI;
+        let angleY = -(mousePosition.y - window.innerHeight / 2) / window.innerHeight * Math.PI;
+
+        let offsetX = Math.sin(angleX) * this.distance;
+        let offsetY = Math.sin(angleY + Math.PI) * this.distance;
+        let offsetZ = Math.cos(angleX) * this.distance;
 
         location.x += offsetX;
         location.y += offsetY;
@@ -32,11 +45,14 @@ export class OrbitPerspective implements Perspective {
         this.location = location;
     }
 
-    private computeRotation() {
+    private computeRotation(mousePosition: Vector2D) {
         let rotation = this.entity.getRotation().clone();
 
-        rotation.yaw = this.clock.getTime() / 1000 % (Math.PI * 2);
-        rotation.pitch = Math.PI * -0.25;
+        let angleX = -(mousePosition.x - window.innerWidth) / window.innerWidth * 2 * Math.PI;
+        let angleY = -(mousePosition.y - window.innerHeight / 2) / window.innerHeight * Math.PI;
+
+        rotation.yaw = (angleX + Math.PI) % (Math.PI * 2);
+        rotation.pitch = angleY;
 
         this.rotation = rotation;
     }
@@ -74,8 +90,8 @@ export class OrbitPerspective implements Perspective {
     }
 
     updatePerspective() {
-        this.computeLocation();
-        this.computeRotation();
+        this.computeLocation(this.mousePosition);
+        this.computeRotation(this.mousePosition);
         this.computeChunkLocation();
         this.computeTransformationMatrix();
     }

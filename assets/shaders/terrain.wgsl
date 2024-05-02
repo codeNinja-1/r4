@@ -11,8 +11,7 @@ struct Camera {
 
 struct VertexOut {
     @builtin(position) position: vec4f,
-    @location(0) texcoord: vec2f,
-    @location(1) offset: vec3f
+    @location(0) texcoord: vec2f
 }
 
 @vertex fn vertex_main(@builtin(instance_index) instanceIndex: u32, @builtin(vertex_index) vertexIndex: u32) -> VertexOut {
@@ -24,11 +23,10 @@ struct VertexOut {
 
     vertex.texcoord = blockTexcoords[vertexIndex];
     vertex.position = camera.matrix * vec4f(vec3(x + chunkPosition.x * 16, y, z + chunkPosition.y * 16) + blockGeometry[vertexIndex], 1.0);
-    vertex.offset = blockGeometry[vertexIndex];
 
     return vertex;
 }
 
-@fragment fn fragment_main(@location(0) texcoord: vec2f, @location(1) offset: vec3f) -> @location(0) vec4f {
-    return (textureSample(blockTexture, blockTextureSampler, texcoord) + vec4f(offset, 1.0) * 0.1) * 1.1;
+@fragment fn fragment_main(@location(0) texcoord : vec2f) -> @location(0) vec4f {
+    return textureSample(blockTexture, blockTextureSampler, texcoord);
 }

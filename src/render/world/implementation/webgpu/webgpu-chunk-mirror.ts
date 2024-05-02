@@ -13,7 +13,7 @@ export class WebGPUChunkMirror implements RenderChunkMirror {
         this.instancedData = new WebGPUInstancedData(worldMirror.getTerrainMesh(), this.chunk.getChunkData());
     }
 
-    getIndirectDrawCalls(): ArrayBuffer {
+    getIndirectDrawCalls(): Uint32Array {
         return this.instancedData.getIndirectCalls();
     }
 

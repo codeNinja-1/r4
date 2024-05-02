@@ -19,7 +19,8 @@ export class DepthTexture {
             label: "Depth Texture",
             format: 'depth24plus',
             size: [ this.width, this.height],
-            usage: GPUTextureUsage.RENDER_ATTACHMENT
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            sampleCount: this.device.getRenderer().getMultisampleTexture().getSampleCount()
         });
 
         this.view = this.texture.createView({ label: "Depth Texture [View]" });

@@ -20,7 +20,7 @@ export class BlockModel extends IndexedRegistryItem implements StaticModel {
 
     getVertexPositions(): Float32Array {
         const components = Array.from(this.components);
-        const positions = components.map(component => component.getVertexPositions(new ImmutableVector3D()));
+        const positions = components.map(component => component.getVertexPositions());
         const buffer = DataUtils.concat(positions);
 
         return new Float32Array(buffer);

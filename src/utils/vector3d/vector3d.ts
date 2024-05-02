@@ -71,18 +71,6 @@ export abstract class Vector3D {
         }
     }
 
-    complexMultiply(x: number | Vector3D, y?: number, z?: number) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this._set(this.x * x - this.y * y, this.x * y + this.y * x, this.z * z);
-            } else {
-                return this._set(this.x * x, this.y * x, this.z * x);
-            }
-        } else {
-            return this._set(this.x * x.x - this.y * x.y, this.x * x.y + this.y * x.x, this.z * x.z);
-        }
-    }
-
     scalarMultiply(x: number | Vector3D, y?: number, z?: number) {
         if (typeof x === 'number') {
             if (typeof y === 'number' && typeof z === 'number') {
@@ -169,7 +157,7 @@ export abstract class Vector3D {
         return this.scalarDivide(this.length());
     }
 
-    * [Symbol.iterator]() {
+    * [Symbol.iterator](): IterableIterator<number> {
         yield this.x;
         yield this.y;
     }
@@ -190,5 +178,9 @@ export abstract class Vector3D {
 
     equals(other: Vector3D) {
         return this.x == other.x && this.y == other.y && this.z == other.z;
+    }
+
+    aboutEquals(other: Vector3D, epsilon: number = 1e-8) {
+        return Math.abs(this.x - other.x) <= epsilon && Math.abs(this.y - other.y) <= epsilon && Math.abs(this.z - other.z) <= epsilon;
     }
 }

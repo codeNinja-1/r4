@@ -424,19 +424,6 @@ class Vector3D {
             return this._set(x.x - this.x, x.y - this.y, x.z - this.z);
         }
     }
-    complexMultiply(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this._set(this.x * x - this.y * y, this.x * y + this.y * x, this.z * z);
-            }
-            else {
-                return this._set(this.x * x, this.y * x, this.z * x);
-            }
-        }
-        else {
-            return this._set(this.x * x.x - this.y * x.y, this.x * x.y + this.y * x.x, this.z * x.z);
-        }
-    }
     scalarMultiply(x, y, z) {
         if (typeof x === 'number') {
             if (typeof y === 'number' && typeof z === 'number') {
@@ -544,6 +531,9 @@ class Vector3D {
     }
     equals(other) {
         return this.x == other.x && this.y == other.y && this.z == other.z;
+    }
+    aboutEquals(other, epsilon = 1e-8) {
+        return Math.abs(this.x - other.x) <= epsilon && Math.abs(this.y - other.y) <= epsilon && Math.abs(this.z - other.z) <= epsilon;
     }
 }
 
@@ -1496,6 +1486,14 @@ var NoiseUtils;
     NoiseUtils.octavedNoise3D = octavedNoise3D;
 })(NoiseUtils || (NoiseUtils = {}));
 
+var MathUtils;
+(function (MathUtils) {
+    function map(value, min, max, newMin, newMax) {
+        return (value - min) * (newMax - newMin) / (max - min) + newMin;
+    }
+    MathUtils.map = map;
+})(MathUtils || (MathUtils = {}));
+
 class SimpleWorldGenerator {
     surface2DNoise;
     surface3DNoise;
@@ -1508,46 +1506,81 @@ class SimpleWorldGenerator {
     async createDensities(location, data) {
         for (let x = 0; x < ChunkDataReferencer.dimensions.x; x++) {
             for (let z = 0; z < ChunkDataReferencer.dimensions.z; z++) {
-                let surface2d = (this.surface2DNoise(x + location.x * ChunkDataReferencer.dimensions.x, z + location.y * ChunkDataReferencer.dimensions.z) / 2 + 0.5) / 2 + 0.5;
+                // Direct sample (-1 to 1)
+                let sample2d = this.surface2DNoise(x + location.x * ChunkDataReferencer.dimensions.x, z + location.y * ChunkDataReferencer.dimensions.z);
+                // Surface height (1/4 to 3/4)
+                let surface2d = MathUtils.map(sample2d, -1, 1, 0.25, 0.75);
                 for (let y = 0; y < ChunkDataReferencer.dimensions.y; y++) {
-                    let yFraction = y / ChunkDataReferencer.dimensions.y;
-                    let surface3d = this.surface3DNoise(x + location.x * ChunkDataReferencer.dimensions.x, y, z + location.y * ChunkDataReferencer.dimensions.z);
-                    let surface = (surface2d - yFraction) + surface3d / 2;
-                    data.getField('surface').set(x, y, z, surface);
+                    // Fraction of the way through the chunk (0 to 1)
+                    let yFraction = MathUtils.map(y, 0, ChunkDataReferencer.dimensions.y, 0, 1);
+                    // Direct sample (-1 to 1)
+                    let density3d = this.surface3DNoise(x + location.x * ChunkDataReferencer.dimensions.x, y, z + location.y * ChunkDataReferencer.dimensions.z);
+                    // Mapped sample (-1/4 to 1/4)
+                    let density3dScaled = density3d / 4;
+                    // Surface offset (centered around 0)
+                    let surfaceOffset = surface2d - yFraction;
+                    let density = surfaceOffset + density3dScaled;
+                    data.getField('density').set(x, y, z, density);
                     let cave = 0;
                     for (let noise of this.caveNoises) {
                         cave += Math.abs(noise((x + location.x * ChunkDataReferencer.dimensions.x) / 32, y / 32, (z + location.y * ChunkDataReferencer.dimensions.z) / 32));
                     }
+                    // -1 to 1
                     cave /= this.caveNoises.length;
-                    cave = 2 * Math.pow((cave + 1) / 2, 2) - 1;
+                    cave = cave ** 2 * Math.sign(cave);
                     data.getField('cave').set(x, y, z, cave);
+                }
+            }
+        }
+    }
+    async calculateDepth(data) {
+        for (let x = 0; x < ChunkDataReferencer.dimensions.x; x++) {
+            for (let z = 0; z < ChunkDataReferencer.dimensions.z; z++) {
+                let depth = 0;
+                for (let y = ChunkDataReferencer.dimensions.y - 1; y >= 0; y--) {
+                    let density = data.getField('density').get(x, y, z);
+                    depth++;
+                    if (density < 0) {
+                        depth = 0;
+                    }
+                    data.getField('depth').set(x, y, z, depth);
                 }
             }
         }
     }
     async generateChunk(location) {
         const data = new ChunkData();
-        const densities = new ChunkData(new Map([
-            ['surface', new ChunkDataNumberAllocation('f32').instantiate()],
-            ['cave', new ChunkDataNumberAllocation('f32').instantiate()]
+        const fields = new ChunkData(new Map([
+            ['density', new ChunkDataNumberAllocation('f32').instantiate()],
+            ['cave', new ChunkDataNumberAllocation('f32').instantiate()],
+            ['depth', new ChunkDataNumberAllocation('u8').instantiate()]
         ]));
-        const surfaceDensity = densities.getField('surface');
-        densities.getField('cave');
-        await this.createDensities(location, densities);
+        fields.getField('cave');
+        const depthField = fields.getField('depth');
+        await this.createDensities(location, fields);
+        await this.calculateDepth(fields);
         const stone = Registries.blocks.get('stone');
         const air = Registries.blocks.get('air');
         const dirt = Registries.blocks.get('dirt');
-        if (!(stone && air && dirt)) {
+        const grass = Registries.blocks.get('grass');
+        if (!(stone && air && dirt && grass)) {
             throw new Error("Failed to blocks for simple world generator");
         }
         for (let x = 0; x < ChunkDataReferencer.dimensions.x; x++) {
             for (let z = 0; z < ChunkDataReferencer.dimensions.z; z++) {
                 for (let y = 0; y < ChunkDataReferencer.dimensions.y; y++) {
-                    if (surfaceDensity.get(x, y, z) > 0) {
-                        data.setBlock(x, y, z, stone);
+                    const depth = depthField.get(x, y, z);
+                    if (depth == 0) {
+                        data.setBlock(x, y, z, air);
+                    }
+                    else if (depth == 1) {
+                        data.setBlock(x, y, z, grass);
+                    }
+                    else if (depth < 5) {
+                        data.setBlock(x, y, z, dirt);
                     }
                     else {
-                        data.setBlock(x, y, z, air);
+                        data.setBlock(x, y, z, stone);
                     }
                 }
             }
@@ -1673,6 +1706,8 @@ class Texture extends IndexedRegistryItem {
         return new Texture(data, width, height);
     }
     static load(name) {
+        if (Registries.textures.get(name))
+            return Promise.resolve(Registries.textures.get(name));
         const url = '/assets/textures/' + name.replace(/\./g, '/') + '.png';
         return new Promise((resolve, reject) => {
             const image = new Image();
@@ -1716,7 +1751,7 @@ class BlockModel extends IndexedRegistryItem {
     }
     getVertexPositions() {
         const components = Array.from(this.components);
-        const positions = components.map(component => component.getVertexPositions(new ImmutableVector3D()));
+        const positions = components.map(component => component.getVertexPositions());
         const buffer = DataUtils.concat(positions);
         return new Float32Array(buffer);
     }
@@ -1744,101 +1779,244 @@ class BlockModel extends IndexedRegistryItem {
     }
 }
 
-class Matrix3 {
-    data;
-    constructor(data = [1, 0, 0, 0, 1, 0, 0, 0, 1]) {
-        this.data = data;
+class BoxModelComponent {
+    dimensions;
+    textures;
+    constructor(dimensions, textures) {
+        this.dimensions = dimensions;
+        this.textures = textures;
     }
-    multiply(value) {
-        if (value instanceof Vector3D) {
-            return Matrix3.multiplyVector(this, value);
+    getVertexPositions() {
+        const vertices = new Float32Array(BoxModelComponent.geometry.length);
+        for (let i = 0; i < vertices.length / 3; i++) {
+            const x = BoxModelComponent.geometry[i * 3];
+            const y = BoxModelComponent.geometry[i * 3 + 1];
+            const z = BoxModelComponent.geometry[i * 3 + 2];
+            vertices[i * 3] = x * this.dimensions.x;
+            vertices[i * 3 + 1] = y * this.dimensions.y;
+            vertices[i * 3 + 2] = z * this.dimensions.z;
         }
-        else if (value instanceof Matrix3) {
-            return Matrix3.multiply(this, value, this);
+        return vertices;
+    }
+    getTextureMappings() {
+        const output = new Float32Array(12 * 6);
+        for (let i = 0; i < 6; i++) {
+            for (let j = 0; j < 6; j++) {
+                let texture = this.textures[i];
+                let mappings = BoxModelComponent.textureMappings[i];
+                if (!mappings || !texture)
+                    continue;
+                output[i * 12 + j * 2] = mappings[j * 2] * texture.getTextureWidth();
+                output[i * 12 + j * 2 + 1] = mappings[j * 2 + 1] * texture.getTextureHeight();
+            }
         }
-        else {
-            throw new Error("Invalid arguments");
+        return output;
+    }
+    getTextureIds() {
+        return new Uint32Array([
+            this.textures[0].getRegisteredId(),
+            this.textures[0].getRegisteredId(),
+            this.textures[1].getRegisteredId(),
+            this.textures[1].getRegisteredId(),
+            this.textures[2].getRegisteredId(),
+            this.textures[2].getRegisteredId(),
+            this.textures[3].getRegisteredId(),
+            this.textures[3].getRegisteredId(),
+            this.textures[4].getRegisteredId(),
+            this.textures[4].getRegisteredId(),
+            this.textures[5].getRegisteredId(),
+            this.textures[5].getRegisteredId()
+        ]);
+    }
+    static geometry = new Float32Array([
+        // North face (-z)
+        1, 1, 0,
+        0, 1, 0,
+        0, 0, 0,
+        1, 1, 0,
+        0, 0, 0,
+        1, 0, 0,
+        // South face (+z)
+        0, 1, 1,
+        1, 1, 1,
+        1, 0, 1,
+        0, 1, 1,
+        1, 0, 1,
+        0, 0, 1,
+        // East face (+x)
+        1, 1, 1,
+        1, 1, 0,
+        1, 0, 0,
+        1, 1, 1,
+        1, 0, 0,
+        1, 0, 1,
+        // West face (-x)
+        0, 1, 0,
+        0, 1, 1,
+        0, 0, 1,
+        0, 1, 0,
+        0, 0, 1,
+        0, 0, 0,
+        // Up face (+y)
+        0, 1, 1,
+        0, 1, 0,
+        1, 1, 0,
+        1, 1, 1,
+        0, 1, 1,
+        1, 1, 0,
+        // Down face (-y)
+        1, 0, 1,
+        1, 0, 0,
+        0, 0, 0,
+        0, 0, 1,
+        1, 0, 1,
+        0, 0, 0
+    ]);
+    static textureNorth = new Float32Array([
+        1, 0,
+        0, 0,
+        0, 1,
+        1, 0,
+        0, 1,
+        1, 1
+    ]);
+    static textureSouth = new Float32Array([
+        0, 0,
+        1, 0,
+        1, 1,
+        0, 0,
+        1, 1,
+        0, 1
+    ]);
+    static textureEast = new Float32Array([
+        1, 0,
+        0, 0,
+        0, 1,
+        1, 0,
+        0, 1,
+        1, 1
+    ]);
+    static textureWest = new Float32Array([
+        0, 0,
+        1, 0,
+        1, 1,
+        0, 0,
+        1, 1,
+        0, 1
+    ]);
+    static textureTop = new Float32Array([
+        1, 0,
+        1, 1,
+        0, 1,
+        0, 0,
+        1, 0,
+        0, 1
+    ]);
+    static textureBottom = new Float32Array([
+        1, 1,
+        1, 0,
+        0, 0,
+        0, 1,
+        1, 1,
+        0, 0
+    ]);
+    static textureMappings = [this.textureNorth, this.textureSouth, this.textureEast, this.textureWest, this.textureTop, this.textureBottom];
+}
+
+class DirtPrototype extends BaseBlockPrototype {
+    whenPlaced(position) {
+        console.log("Dirt placed at " + position.toString());
+    }
+    getBlockModel(position) {
+        return DirtPrototype.model;
+    }
+    static model;
+    static texture;
+    static async setup() {
+        this.texture = await Texture.load("blocks.dirt");
+        this.model = new BlockModel();
+        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), new Array(6).fill(this.texture));
+        this.model.add(box);
+    }
+    static getBlockModel() {
+        return DirtPrototype.model;
+    }
+}
+
+class Quaternion {
+    x;
+    y;
+    z;
+    w;
+    constructor(x = 0, y = 0, z = 0, w = 0) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+    }
+    multiply(quaternion) {
+        const x = this.w * quaternion.x + this.x * quaternion.w + this.y * quaternion.z - this.z * quaternion.y;
+        const y = this.w * quaternion.y + this.y * quaternion.w + this.z * quaternion.x - this.x * quaternion.z;
+        const z = this.w * quaternion.z + this.z * quaternion.w + this.x * quaternion.y - this.y * quaternion.x;
+        const w = this.w * quaternion.w - this.x * quaternion.x - this.y * quaternion.y - this.z * quaternion.z;
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+        return this;
+    }
+    times(quaternion) {
+        return this.clone().multiply(quaternion);
+    }
+    magnitude() {
+        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
+    }
+    inverse() {
+        let magnitude = this.magnitude();
+        let x = -this.x / magnitude;
+        let y = -this.y / magnitude;
+        let z = -this.z / magnitude;
+        let w = this.w / magnitude;
+        return new Quaternion(x, y, z, w);
+    }
+    rotate(vector) {
+        let quaternion = new Quaternion(0, vector.x, vector.y, vector.z);
+        let inverse = this.clone().inverse();
+        let result = this.clone().multiply(quaternion).multiply(inverse);
+        return new MutableVector3D(result.x, result.y, result.z);
+    }
+    inverseRotate(vector) {
+        let quaternion = new Quaternion(0, vector.x, vector.y, vector.z);
+        let inverse = this.clone().inverse();
+        let result = inverse.multiply(quaternion).multiply(this);
+        return new MutableVector3D(result.x, result.y, result.z);
+    }
+    clone() {
+        return new Quaternion(this.x, this.y, this.z, this.w);
+    }
+    toString() {
+        return `Quaternion { ${this.x}, ${this.y}, ${this.z}, ${this.w} }`;
+    }
+    equals(other) {
+        return this.x === other.x && this.y === other.y && this.z === other.z && this.w === other.w;
+    }
+    static fromAxisAngle(axis, angle) {
+        let cos = Math.cos(angle / 2);
+        let sin = Math.sin(angle / 2);
+        return new Quaternion(cos, axis.x * sin, axis.y * sin, axis.z * sin);
+    }
+    static fromRotation(rotation) {
+        let quaternion = null;
+        for (const [axis, angle] of rotation.toAxisRotations()) {
+            let part = Quaternion.fromAxisAngle(axis, angle);
+            if (quaternion)
+                quaternion.multiply(part);
+            else
+                quaternion = part;
         }
-    }
-    static multiply(matrix1, matrix2, target = new Matrix3()) {
-        const a = matrix1.data;
-        const b = matrix2.data;
-        const c = target.data;
-        const a00 = a[0], a01 = a[1], a02 = a[2];
-        const a10 = a[3], a11 = a[4], a12 = a[5];
-        const a20 = a[6], a21 = a[7], a22 = a[8];
-        const b00 = b[0], b01 = b[1], b02 = b[2];
-        const b10 = b[3], b11 = b[4], b12 = b[5];
-        const b20 = b[6], b21 = b[7], b22 = b[8];
-        c[0] = b00 * a00 + b01 * a10 + b02 * a20;
-        c[1] = b00 * a01 + b01 * a11 + b02 * a21;
-        c[2] = b00 * a02 + b01 * a12 + b02 * a22;
-        c[3] = b10 * a00 + b11 * a10 + b12 * a20;
-        c[4] = b10 * a01 + b11 * a11 + b12 * a21;
-        c[5] = b10 * a02 + b11 * a12 + b12 * a22;
-        c[6] = b20 * a00 + b21 * a10 + b22 * a20;
-        c[7] = b20 * a01 + b21 * a11 + b22 * a21;
-        c[8] = b20 * a02 + b21 * a12 + b22 * a22;
-        return target;
-    }
-    static multiplyVector(matrix, vector, target = new MutableVector3D()) {
-        const a = matrix.data;
-        const b = vector;
-        const c = target;
-        const x = b.x, y = b.y, z = b.z;
-        c.x = a[0] * x + a[3] * y + a[6] * z;
-        c.y = a[1] * x + a[4] * y + a[7] * z;
-        c.z = a[2] * x + a[5] * y + a[8] * z;
-        return target;
-    }
-    static createRotation(rotation, target = new Matrix3()) {
-        let matrix = target || new Matrix3();
-        matrix.multiply(Matrix3.createRotationY(rotation.yaw));
-        matrix.multiply(Matrix3.createRotationX(rotation.pitch));
-        matrix.multiply(Matrix3.createRotationZ(rotation.roll));
-        return matrix;
-    }
-    static createRotationX(angle, target = new Matrix3()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = 1;
-        target.data[1] = 0;
-        target.data[2] = 0;
-        target.data[4] = 0;
-        target.data[5] = cos;
-        target.data[6] = sin;
-        target.data[8] = 0;
-        target.data[9] = -sin;
-        target.data[10] = cos;
-        return target;
-    }
-    static createRotationY(angle, target = new Matrix3()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = cos;
-        target.data[1] = 0;
-        target.data[2] = -sin;
-        target.data[4] = 0;
-        target.data[5] = 1;
-        target.data[6] = 0;
-        target.data[8] = sin;
-        target.data[9] = 0;
-        target.data[10] = cos;
-        return target;
-    }
-    static createRotationZ(angle, target = new Matrix3()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = cos;
-        target.data[1] = sin;
-        target.data[2] = 0;
-        target.data[4] = -sin;
-        target.data[5] = cos;
-        target.data[6] = 0;
-        target.data[8] = 0;
-        target.data[9] = 0;
-        target.data[10] = 1;
-        return target;
+        if (!quaternion)
+            throw new Error('Failed to create quaternion from rotation');
+        return quaternion;
     }
 }
 
@@ -1881,204 +2059,89 @@ class Rotation {
     clone() {
         return new Rotation(this.yaw, this.pitch, this.roll);
     }
+    *toAxisRotations() {
+        yield [new MutableVector3D(0, 1, 0), this.yaw];
+        yield [new MutableVector3D(1, 0, 0), this.pitch];
+        yield [new MutableVector3D(0, 0, 1), this.roll];
+    }
     static fromDegrees(yaw, pitch, roll) {
         return new Rotation(Math.PI / 180 * yaw, Math.PI / 180 * pitch, Math.PI / 180 * roll);
     }
 }
 
-var Orientation;
-(function (Orientation) {
-    Orientation[Orientation["North"] = 0] = "North";
-    Orientation[Orientation["East"] = 1] = "East";
-    Orientation[Orientation["South"] = 2] = "South";
-    Orientation[Orientation["West"] = 3] = "West";
-    Orientation[Orientation["Up"] = 4] = "Up";
-    Orientation[Orientation["Down"] = 5] = "Down";
-})(Orientation || (Orientation = {}));
-(function (Orientation) {
-    const rotations = new Map();
-    function getRotation(orientation) {
-        if (!rotations.has(orientation)) {
-            rotations.set(orientation, calculateRotation(orientation));
-        }
-        return rotations.get(orientation);
-    }
-    Orientation.getRotation = getRotation;
-    function calculateRotation(orientation) {
-        switch (orientation) {
-            case Orientation.North: return Rotation.fromDegrees(0, 0, 0);
-            case Orientation.East: return Rotation.fromDegrees(0, 90, 0);
-            case Orientation.South: return Rotation.fromDegrees(0, 180, 0);
-            case Orientation.West: return Rotation.fromDegrees(0, 270, 0);
-            case Orientation.Up: return Rotation.fromDegrees(-90, 0, 0);
-            case Orientation.Down: return Rotation.fromDegrees(90, 0, 0);
-        }
-    }
-    const matrices = new Map();
-    function getMatrix(orientation) {
-        if (!matrices.has(orientation)) {
-            matrices.set(orientation, Matrix3.createRotation(getRotation(orientation)));
-        }
-        return matrices.get(orientation);
-    }
-    Orientation.getMatrix = getMatrix;
-})(Orientation || (Orientation = {}));
-
-class PositionedModelComponent {
-    position = new MutableVector3D();
-    getPosition() {
-        return this.position.clone();
-    }
-    setPosition(position) {
-        this.position.set(position);
-    }
-}
-
-class GroupModelComponent extends PositionedModelComponent {
-    components = new Set();
-    getVertexPositions(parentPosition) {
-        const components = Array.from(this.components);
-        const positions = components.map(component => component.getVertexPositions(parentPosition));
-        const buffer = DataUtils.concat(positions);
-        const array = new Float32Array(buffer);
-        return array;
+class EmptyModelComponent {
+    getVertexPositions() {
+        return new Float32Array();
     }
     getTextureMappings() {
-        const components = Array.from(this.components);
-        const textureMappings = components.map(component => component.getTextureMappings());
-        const buffer = DataUtils.concat(textureMappings);
-        return new Float32Array(buffer);
+        return new Float32Array();
     }
     getTextureIds() {
-        const components = Array.from(this.components);
-        const textureIds = components.map(component => component.getTextureIds());
-        const buffer = DataUtils.concat(textureIds);
-        return new Uint32Array(buffer);
-    }
-    add(...components) {
-        for (const component of components) {
-            this.components.add(component);
-        }
-    }
-    remove(...components) {
-        for (const component of components) {
-            this.components.delete(component);
-        }
+        return new Uint32Array();
     }
 }
 
-class PlaneModelComponent extends PositionedModelComponent {
-    width;
-    height;
-    orientation = Orientation.North;
-    texture;
-    constructor(texture, size, orientation) {
-        super();
-        this.width = size.x;
-        this.height = size.y;
-        this.texture = texture;
-        this.orientation = orientation;
+class RotatedModelComponent {
+    origin;
+    child;
+    quaternion;
+    constructor(rotation = new Rotation(), origin = new ImmutableVector3D(0.5, 0.5, 0.5), child = new EmptyModelComponent()) {
+        this.origin = origin;
+        this.child = child;
+        this.quaternion = rotation instanceof Rotation ? Quaternion.fromRotation(rotation) : rotation;
+    }
+    getQuaternion() {
+        return this.quaternion.clone();
+    }
+    setQuaternion(quaternion) {
+        this.quaternion = quaternion;
+    }
+    add(child) {
+        this.child = child;
     }
     getVertexPositions() {
-        return PlaneModelComponent.makePlaneVertices(this.orientation, this.width, this.height, this.getPosition());
+        const childVertices = this.child.getVertexPositions();
+        for (let i = 0; i < childVertices.length / 3; i++) {
+            const x = childVertices[i * 3];
+            const y = childVertices[i * 3 + 1];
+            const z = childVertices[i * 3 + 2];
+            const position = this.quaternion.rotate(new MutableVector3D(x, y, z).subtract(this.origin)).add(this.origin);
+            childVertices[i * 3] = position.x;
+            childVertices[i * 3 + 1] = position.y;
+            childVertices[i * 3 + 2] = position.z;
+        }
+        return childVertices;
     }
     getTextureMappings() {
-        const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
-        const width = this.texture.getTextureWidth();
-        const height = this.texture.getTextureHeight();
-        for (let i = 0; i < data.length / 2; i++) {
-            data[i * 2] = PlaneModelComponent.baseTextureMapping[i * 2] * width;
-            data[i * 2 + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] * height;
-        }
-        return data;
+        return this.child.getTextureMappings();
     }
     getTextureIds() {
-        const textureId = this.texture.getRegisteredId();
-        return new Uint32Array([
-            textureId,
-            textureId
-        ]);
-    }
-    static orientPlaneVertex(orientation, x, y) {
-        if (orientation == Orientation.Up || orientation == Orientation.Down) {
-            return new ImmutableVector3D(x, 0, y);
-        }
-        else if (orientation == Orientation.North || orientation == Orientation.South) {
-            return new ImmutableVector3D(x, y, 0);
-        }
-        else if (orientation == Orientation.East || orientation == Orientation.West) {
-            return new ImmutableVector3D(0, x, y);
-        }
-        else {
-            throw new Error("Invalid orientation");
-        }
-    }
-    static makePlaneVertices(orientation, width, height, position) {
-        const source = PlaneModelComponent.baseGeometry.map(x => x);
-        const vertices = new Float32Array(source.length / 2 * 3);
-        for (let i = 0; i < source.length / 2; i++) {
-            const vertex = PlaneModelComponent.orientPlaneVertex(orientation, source[i * 2] * width, source[i * 2 + 1] * height);
-            vertices[i * 3] = vertex.x + position.x;
-            vertices[i * 3 + 1] = vertex.y + position.y;
-            vertices[i * 3 + 2] = vertex.z + position.z;
-        }
-        return vertices;
-    }
-    static baseTextureMapping = new Uint8Array([
-        1, 1,
-        1, 0,
-        0, 0,
-        1, 1,
-        0, 0,
-        0, 1
-    ]);
-    static baseGeometry = PlaneModelComponent.getBasePlaneGeometry();
-    static getBasePlaneGeometry() {
-        const data = new Float32Array(PlaneModelComponent.baseTextureMapping.length);
-        for (let i = 0; i < PlaneModelComponent.baseTextureMapping.length / 2; i++) {
-            data[i * 2] = PlaneModelComponent.baseTextureMapping[i * 2] - 0.5;
-            data[i * 2 + 1] = PlaneModelComponent.baseTextureMapping[i * 2 + 1] - 0.5;
-        }
-        return data;
+        return this.child.getTextureIds();
     }
 }
 
-class BoxModelComponent extends GroupModelComponent {
-    constructor(dimensions, textures) {
-        super();
-        const north = new PlaneModelComponent(textures[0], new ImmutableVector2D(dimensions.x, dimensions.y), Orientation.North);
-        north.setPosition(new ImmutableVector3D(0.5, 0.5, 0));
-        const east = new PlaneModelComponent(textures[1], new ImmutableVector2D(dimensions.z, dimensions.y), Orientation.East);
-        east.setPosition(new ImmutableVector3D(1, 0.5, 0.5));
-        const south = new PlaneModelComponent(textures[2], new ImmutableVector2D(dimensions.x, dimensions.y), Orientation.South);
-        south.setPosition(new ImmutableVector3D(0.5, 0.5, 1));
-        const west = new PlaneModelComponent(textures[3], new ImmutableVector2D(dimensions.z, dimensions.y), Orientation.West);
-        west.setPosition(new ImmutableVector3D(0, 0.5, 0.5));
-        const up = new PlaneModelComponent(textures[4], new ImmutableVector2D(dimensions.x, dimensions.z), Orientation.Up);
-        up.setPosition(new ImmutableVector3D(0.5, 1, 0.5));
-        const down = new PlaneModelComponent(textures[5], new ImmutableVector2D(dimensions.x, dimensions.z), Orientation.Down);
-        down.setPosition(new ImmutableVector3D(0.5, 0, 0.5));
-        this.add(north, east, south, west, up, down);
-    }
-}
-
-class DirtPrototype extends BaseBlockPrototype {
+class GrassPrototype extends BaseBlockPrototype {
     whenPlaced(position) {
-        console.log("Dirt placed at " + position.toString());
+        console.log("Grass placed at " + position.toString());
     }
     getBlockModel(position) {
-        return DirtPrototype.model;
+        return GrassPrototype.model;
     }
     static model;
-    static texture;
+    static top;
+    static side;
+    static bottom;
     static async setup() {
-        this.texture = await Texture.load("blocks.dirt");
+        this.top = await Texture.load("blocks.grass.top");
+        this.side = await Texture.load("blocks.grass.side");
+        this.bottom = await Texture.load("blocks.dirt");
         this.model = new BlockModel();
-        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), new Array(6).fill(this.texture));
-        this.model.add(box);
+        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), [this.side, this.side, this.side, this.side, this.top, this.bottom]);
+        const rotated = new RotatedModelComponent(new Rotation(0, 0, 0), new ImmutableVector3D(0, 0, 0), box);
+        this.model.add(rotated);
     }
     static getBlockModel() {
-        return DirtPrototype.model;
+        return GrassPrototype.model;
     }
 }
 
@@ -2453,6 +2516,9 @@ async function loadGameContent() {
     await DirtPrototype.setup();
     Registries.blocks.register('dirt', new DirtPrototype());
     Registries.blockModels.register('dirt', DirtPrototype.getBlockModel());
+    await GrassPrototype.setup();
+    Registries.blocks.register('grass', new GrassPrototype());
+    Registries.blockModels.register('grass', GrassPrototype.getBlockModel());
     Registries.blocks.register('air', new AirPrototype());
 }
 
@@ -2703,6 +2769,104 @@ var Axis;
     Axis[Axis["Y"] = 1] = "Y";
     Axis[Axis["Z"] = 2] = "Z";
 })(Axis || (Axis = {}));
+
+class Matrix3 {
+    data;
+    constructor(data = [1, 0, 0, 0, 1, 0, 0, 0, 1]) {
+        this.data = data;
+    }
+    multiply(value) {
+        if (value instanceof Vector3D) {
+            return Matrix3.multiplyVector(this, value);
+        }
+        else if (value instanceof Matrix3) {
+            return Matrix3.multiply(this, value, this);
+        }
+        else {
+            throw new Error("Invalid arguments");
+        }
+    }
+    static multiply(matrix1, matrix2, target = new Matrix3()) {
+        const a = matrix1.data;
+        const b = matrix2.data;
+        const c = target.data;
+        const a00 = a[0], a01 = a[1], a02 = a[2];
+        const a10 = a[3], a11 = a[4], a12 = a[5];
+        const a20 = a[6], a21 = a[7], a22 = a[8];
+        const b00 = b[0], b01 = b[1], b02 = b[2];
+        const b10 = b[3], b11 = b[4], b12 = b[5];
+        const b20 = b[6], b21 = b[7], b22 = b[8];
+        c[0] = b00 * a00 + b01 * a10 + b02 * a20;
+        c[1] = b00 * a01 + b01 * a11 + b02 * a21;
+        c[2] = b00 * a02 + b01 * a12 + b02 * a22;
+        c[3] = b10 * a00 + b11 * a10 + b12 * a20;
+        c[4] = b10 * a01 + b11 * a11 + b12 * a21;
+        c[5] = b10 * a02 + b11 * a12 + b12 * a22;
+        c[6] = b20 * a00 + b21 * a10 + b22 * a20;
+        c[7] = b20 * a01 + b21 * a11 + b22 * a21;
+        c[8] = b20 * a02 + b21 * a12 + b22 * a22;
+        return target;
+    }
+    static multiplyVector(matrix, vector, target = new MutableVector3D()) {
+        const a = matrix.data;
+        const b = vector;
+        const c = target;
+        const x = b.x, y = b.y, z = b.z;
+        c.x = a[0] * x + a[3] * y + a[6] * z;
+        c.y = a[1] * x + a[4] * y + a[7] * z;
+        c.z = a[2] * x + a[5] * y + a[8] * z;
+        return target;
+    }
+    static createRotation(rotation, target = new Matrix3()) {
+        let matrix = target || new Matrix3();
+        matrix.multiply(Matrix3.createRotationY(rotation.yaw));
+        matrix.multiply(Matrix3.createRotationX(rotation.pitch));
+        matrix.multiply(Matrix3.createRotationZ(rotation.roll));
+        return matrix;
+    }
+    static createRotationX(angle, target = new Matrix3()) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        target.data[0] = 1;
+        target.data[1] = 0;
+        target.data[2] = 0;
+        target.data[4] = 0;
+        target.data[5] = cos;
+        target.data[6] = sin;
+        target.data[8] = 0;
+        target.data[9] = -sin;
+        target.data[10] = cos;
+        return target;
+    }
+    static createRotationY(angle, target = new Matrix3()) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        target.data[0] = cos;
+        target.data[1] = 0;
+        target.data[2] = -sin;
+        target.data[4] = 0;
+        target.data[5] = 1;
+        target.data[6] = 0;
+        target.data[8] = sin;
+        target.data[9] = 0;
+        target.data[10] = cos;
+        return target;
+    }
+    static createRotationZ(angle, target = new Matrix3()) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        target.data[0] = cos;
+        target.data[1] = sin;
+        target.data[2] = 0;
+        target.data[4] = -sin;
+        target.data[5] = cos;
+        target.data[6] = 0;
+        target.data[8] = 0;
+        target.data[9] = 0;
+        target.data[10] = 1;
+        return target;
+    }
+}
 
 class Matrix4 {
     data;
@@ -3202,7 +3366,8 @@ class DepthTexture {
             label: "Depth Texture",
             format: 'depth24plus',
             size: [this.width, this.height],
-            usage: GPUTextureUsage.RENDER_ATTACHMENT
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+            sampleCount: this.device.getRenderer().getMultisampleTexture().getSampleCount()
         });
         this.view = this.texture.createView({ label: "Depth Texture [View]" });
     }
@@ -3272,6 +3437,30 @@ class GraphicsDevice {
     }
 }
 
+class MultisampleTexture {
+    texture;
+    device;
+    width;
+    height;
+    view;
+    async resize(width, height) {
+        return;
+    }
+    async setup(device) {
+        this.device = device;
+    }
+    addToAttachment(source = {}) {
+        const canvasTextureView = this.device.getContext().getCurrentTexture().createView({ label: "Canvas Texture [View]" });
+        return Object.assign(source, {
+            view: canvasTextureView
+        });
+    }
+    getSampleCount() {
+        return MultisampleTexture.ENABLED ? 4 : 1;
+    }
+    static ENABLED = false;
+}
+
 class ClearRenderPass {
     color;
     device;
@@ -3289,14 +3478,11 @@ class ClearRenderPass {
         });
         const renderPassDescriptor = {
             colorAttachments: [
-                {
+                this.device.getRenderer().getMultisampleTexture().addToAttachment({
                     clearValue: Color.toGPUColor(this.color),
                     loadOp: "clear",
-                    storeOp: "store",
-                    view: this.device.getContext().getCurrentTexture().createView({
-                        label: "Canvas Texture [View]"
-                    })
-                }
+                    storeOp: "store"
+                })
             ],
             depthStencilAttachment: {
                 view: this.device.getRenderer().getDepthTexture().createView(),
@@ -3468,9 +3654,11 @@ class BaseRenderPass {
     }
     async setup(device) {
         const gpuDevice = device.getDevice();
+        this.descriptor.multisample = {
+            count: device.getRenderer().getMultisampleTexture().getSampleCount()
+        };
         const layoutDescriptor = {};
         this.bindGroupManager.addBindGroupsToPipelineLayout(layoutDescriptor);
-        console.log(layoutDescriptor);
         this.pipelineLayout = gpuDevice.createPipelineLayout(layoutDescriptor);
         this.descriptor.layout = this.pipelineLayout;
         if (this.depthTest) {
@@ -3519,11 +3707,10 @@ class BaseRenderPass {
     createRenderPass(commandEncoder) {
         const renderPassDescriptor = {
             colorAttachments: [
-                {
-                    view: this.device.getContext().getCurrentTexture().createView({ label: "Canvas Texture [View]" }),
+                this.device.getRenderer().getMultisampleTexture().addToAttachment({
                     loadOp: "load",
                     storeOp: "store"
-                }
+                })
             ]
         };
         if (this.depthTest) {
@@ -3557,7 +3744,7 @@ class TerrainRenderPass extends BaseRenderPass {
         });
         const shader = await ShaderModule.import("/assets/shaders/terrain.wgsl", "Terrain Shader");
         shader.setup(device);
-        this.addPrimitiveTopology("triangle-list");
+        this.addPrimitiveTopology("triangle-list", "front");
         this.addLabel("Terrain Render Pass");
         this.addVertexStage(shader, "vertex_main");
         this.addFragmentStage(shader, "fragment_main");
@@ -3634,9 +3821,8 @@ class TerrainRenderPass extends BaseRenderPass {
             gpuDevice.queue.submit([commandEncoder.finish()]);
         }
     }
-    _draw(renderPass, gpuDevice, buffer, callsLength) {
+    _draw(renderPass, gpuDevice, drawCalls, callsLength) {
         {
-            const drawCalls = new Uint32Array(buffer);
             for (let i = 0; i < drawCalls.length; i += 4) {
                 const vertexCount = drawCalls[i + 0];
                 const instanceCount = drawCalls[i + 1];
@@ -3648,7 +3834,7 @@ class TerrainRenderPass extends BaseRenderPass {
             }
         }
     }
-    static DISABLE_INDIRECT_DRAWING_FOR_DEBUGGING = true;
+    static DISABLE_INDIRECT_DRAWING = true;
 }
 
 class RenderWorldMirror {
@@ -4089,7 +4275,7 @@ class WebGPUInstancedData extends InstancedData {
         }
     }
     getIndirectCalls() {
-        return this.indirectCalls.buffer;
+        return this.indirectCalls;
     }
     getCallCount() {
         return this.callCount;
@@ -4168,6 +4354,7 @@ class WebGPURenderer {
     renderedWorld;
     passes;
     bindGroupManager;
+    multisampleTexture;
     depthTexture;
     camera;
     perspective;
@@ -4186,6 +4373,9 @@ class WebGPURenderer {
     }
     getDepthTexture() {
         return this.depthTexture;
+    }
+    getMultisampleTexture() {
+        return this.multisampleTexture;
     }
     getCanvas() {
         return this.device.getCanvas();
@@ -4210,6 +4400,8 @@ class WebGPURenderer {
         this.bindGroupManager.addBindGroup(this.camera.getCameraBindGroup());
         this.depthTexture = new DepthTexture();
         await this.depthTexture.setup(this.device);
+        this.multisampleTexture = new MultisampleTexture();
+        await this.multisampleTexture.setup(this.device);
         await this.renderedWorld.setup(this.device);
         for (const pass of this.passes) {
             await pass.setupBindings(this.device);
@@ -4227,6 +4419,7 @@ class WebGPURenderer {
         this.perspective.updatePerspective();
         this.camera.update(this.device);
         await this.depthTexture.resize(canvas.width, canvas.height);
+        await this.multisampleTexture.resize(canvas.width, canvas.height);
         this.renderedWorld.updateRenderedWorld();
         for (const renderPass of this.passes) {
             await renderPass.render();
@@ -4302,25 +4495,39 @@ class OrbitPerspective {
     location;
     rotation;
     chunkLocation;
+    mousePosition;
+    distance = 64;
     constructor(entity, clock) {
         this.entity = entity;
         this.clock = clock;
+        document.addEventListener('mousemove', event => {
+            if (event.shiftKey) {
+                this.distance = this.distance + event.movementY / 2;
+            }
+            else {
+                this.mousePosition = new ImmutableVector2D(event.clientX, event.clientY);
+            }
+        });
+        this.mousePosition = new ImmutableVector2D();
     }
-    computeLocation() {
+    computeLocation(mousePosition) {
         let location = this.entity.getPosition().mutable();
-        let time = this.clock.getTime();
-        let offsetX = Math.sin(time / 1000) * 16;
-        let offsetY = Math.sin(time / 1000) * 8;
-        let offsetZ = Math.cos(time / 1000) * 16;
+        let angleX = -(mousePosition.x - window.innerWidth / 2) / window.innerWidth * 2 * Math.PI;
+        let angleY = -(mousePosition.y - window.innerHeight / 2) / window.innerHeight * Math.PI;
+        let offsetX = Math.sin(angleX) * this.distance;
+        let offsetY = Math.sin(angleY + Math.PI) * this.distance;
+        let offsetZ = Math.cos(angleX) * this.distance;
         location.x += offsetX;
         location.y += offsetY;
         location.z += offsetZ;
         this.location = location;
     }
-    computeRotation() {
+    computeRotation(mousePosition) {
         let rotation = this.entity.getRotation().clone();
-        rotation.yaw = this.clock.getTime() / 1000 % (Math.PI * 2);
-        rotation.pitch = Math.PI * -0.25;
+        let angleX = -(mousePosition.x - window.innerWidth) / window.innerWidth * 2 * Math.PI;
+        let angleY = -(mousePosition.y - window.innerHeight / 2) / window.innerHeight * Math.PI;
+        rotation.yaw = (angleX + Math.PI) % (Math.PI * 2);
+        rotation.pitch = angleY;
         this.rotation = rotation;
     }
     computeTransformationMatrix() {
@@ -4347,8 +4554,8 @@ class OrbitPerspective {
         return 10;
     }
     updatePerspective() {
-        this.computeLocation();
-        this.computeRotation();
+        this.computeLocation(this.mousePosition);
+        this.computeRotation(this.mousePosition);
         this.computeChunkLocation();
         this.computeTransformationMatrix();
     }

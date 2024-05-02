@@ -1,3 +1,6 @@
+import { MutableVector3D } from "../vector3d/mutable-vector3d.js";
+import { Vector3D } from "../vector3d/vector3d.js";
+
 export class Rotation {
     yaw: number;
     pitch: number;
@@ -32,6 +35,12 @@ export class Rotation {
 
     clone() {
         return new Rotation(this.yaw, this.pitch, this.roll);
+    }
+
+    *toAxisRotations(): Iterable<[ Vector3D, number ]> {
+        yield [ new MutableVector3D(0, 1, 0), this.yaw ];
+        yield [ new MutableVector3D(1, 0, 0), this.pitch ];
+        yield [ new MutableVector3D(0, 0, 1), this.roll ];
     }
 
     static fromDegrees(yaw: number, pitch: number, roll: number) {

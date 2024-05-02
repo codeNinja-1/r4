@@ -48,8 +48,8 @@ export class WebGPUInstancedData extends InstancedData {
         }
     }
 
-    getIndirectCalls(): ArrayBuffer {
-        return this.indirectCalls.buffer;
+    getIndirectCalls(): Uint32Array {
+        return this.indirectCalls;
     }
 
     getCallCount(): number {
