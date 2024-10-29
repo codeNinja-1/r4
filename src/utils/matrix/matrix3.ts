@@ -1,15 +1,14 @@
 import { Rotation } from "../rotation/rotation.js";
-import { MutableVector3D } from "../vector3d/mutable-vector3d.js";
-import { Vector3D } from "../vector3d/vector3d.js";
+import { Vector3 } from "../vector3d/vector3.js";
 
 export class Matrix3 {
     constructor(public data: number[] = [ 1, 0, 0, 0, 1, 0, 0, 0, 1 ]) {
     }
 
-    multiply(vector: Vector3D): Vector3D;
+    multiply(vector: Vector3): Vector3;
     multiply(matrix: Matrix3): ThisType<Matrix3>;
-    multiply(value: Vector3D | Matrix3): Vector3D | ThisType<Matrix3> {
-        if (value instanceof Vector3D) {
+    multiply(value: Vector3 | Matrix3): Vector3 | ThisType<Matrix3> {
+        if (value instanceof Vector3) {
             return Matrix3.multiplyVector(this, value);
         } else if (value instanceof Matrix3) {
             return Matrix3.multiply(this, value, this);
@@ -44,7 +43,7 @@ export class Matrix3 {
         return target;
     }
 
-    static multiplyVector(matrix: Matrix3, vector: Vector3D, target: Vector3D = new MutableVector3D()) {
+    static multiplyVector(matrix: Matrix3, vector: Vector3, target: Vector3 = new Vector3()) {
         const a = matrix.data;
         const b = vector;
         const c = target;

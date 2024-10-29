@@ -2,30 +2,24 @@ import { ImmutableVector2D } from "../utils/vector2d/immutable-vector2d.js";
 import { Vector2D } from "../utils/vector2d/vector2d.js";
 import { ChunkData } from "./chunk-data/chunk-data.js";
 import { ChunkInterface } from "./chunk-interface.js";
+import { ChunkLoadState } from "./world-generation/chunk-load-state.js";
 import { World } from "./world.js";
 
-export class Chunk extends ChunkInterface.NonPlaceholder {
+export class BaseChunk extends ChunkInterface.NonPlaceholder {
     private position: ImmutableVector2D;
     private world: World | null = null;
-    private chunkData: ChunkData;
+    protected chunkData: ChunkData;
 
     constructor() {
         super();
-    }
-
-    setChunkData(chunkData: ChunkData): void {
-        this.chunkData = chunkData;
-        this.chunkData.setParentChunk(this);
     }
 
     getPosition(): Vector2D {
         return this.position;
     }
 
-    getWorld(): World {
-        if (!this.world) throw new Error("Cannot get world of unbound chunk");
-
-        return this.world;
+    getWorld(): World | null {
+        return this.world ?? null;
     }
 
     getChunkData(): ChunkData {
@@ -54,4 +48,9 @@ export class Chunk extends ChunkInterface.NonPlaceholder {
     async tickChunk() {
         await this.chunkData.tickChunkData();
     }
+
+    loadState = {
+        current: Infinity,
+        target: Infinity
+    };
 }

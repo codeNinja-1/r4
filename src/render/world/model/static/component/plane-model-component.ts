@@ -1,7 +1,4 @@
-import { Orientation } from "../../../../../utils/rotation/orientation.js";
 import { Vector2D } from "../../../../../utils/vector2d/vector2d.js";
-import { ImmutableVector3D } from "../../../../../utils/vector3d/immutable-vector3d.js";
-import { Vector3D } from "../../../../../utils/vector3d/vector3d.js";
 import { Texture } from "../../../../utils/texture.js";
 import { ModelComponent } from "../model-component.js";
 

@@ -1,5 +1,4 @@
 import { DataUtils } from "../../../../../utils/data-utils.js";
-import { Vector3D } from "../../../../../utils/vector3d/vector3d.js";
 import { ModelComponent } from "../model-component.js";
 
 export class GroupModelComponent implements ModelComponent {

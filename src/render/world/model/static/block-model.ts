@@ -1,6 +1,5 @@
 import { IndexedRegistryItem } from "../../../../game/registry/indexed-registry-item.js";
 import { DataUtils } from "../../../../utils/data-utils.js";
-import { ImmutableVector3D } from "../../../../utils/vector3d/immutable-vector3d.js";
 import { ModelComponent } from "./model-component.js";
 import { StaticModel } from "./static-model.js";
 

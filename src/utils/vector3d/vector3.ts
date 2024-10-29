@@ -1,8 +1,4 @@
 import { Vector2D } from "../vector2d/vector2d.js";
-import { HandleableVector3D } from "./handleable-vector3d.js";
-import { ImmutableVector3D } from "./immutable-vector3d.js";
-import { MutableVector3D } from "./mutable-vector3d.js";
-import { Vector3D } from "./vector3d.js";
 
 export class Vector3 {
     x: number;
@@ -15,12 +11,28 @@ export class Vector3 {
         this.z = z;
     }
 
-    add(x: number | Vector3D, y?: number, z?: number): this {
+    set(x: number | Vector3, y?: number, z?: number): this {
+        if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        } else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
+            this.x = x.x;
+            this.y = x.y;
+            this.z = x.z;
+        } else {
+            throw new TypeError("Invalid arguments");
+        }
+
+        return this;
+    }
+
+    add(x: number | Vector3, y?: number, z?: number): this {
         if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
             this.x += x;
             this.y += y;
             this.z += z;
-        } else if (x instanceof Vector3D && typeof y == 'undefined' && typeof z == 'undefined') {
+        } else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
             this.x += x.x;
             this.y += x.y;
             this.z += x.z;
@@ -31,16 +43,16 @@ export class Vector3 {
         return this;
     }
 
-    plus(x: number | Vector3D, y?: number, z?: number): Vector3 {
+    plus(x: number | Vector3, y?: number, z?: number): Vector3 {
         return this.clone().add(x, y, z);
     }
 
-    subtract(x: number | Vector3D, y?: number, z?: number): this {
+    subtract(x: number | Vector3, y?: number, z?: number): this {
         if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
             this.x -= x;
             this.y -= y;
             this.z -= z;
-        } else if (x instanceof Vector3D && typeof y == 'undefined' && typeof z == 'undefined') {
+        } else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
             this.x -= x.x;
             this.y -= x.y;
             this.z -= x.z;
@@ -51,16 +63,16 @@ export class Vector3 {
         return this;
     }
 
-    minus(x: number | Vector3D, y?: number, z?: number): Vector3 {
+    minus(x: number | Vector3, y?: number, z?: number): Vector3 {
         return this.clone().subtract(x, y, z);
     }
 
-    multiply(x: number | Vector3D, y?: number | undefined, z?: number | undefined): this {
+    multiply(x: number | Vector3, y?: number | undefined, z?: number | undefined): this {
         if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
             this.x *= x;
             this.y *= y;
             this.z *= z;
-        } else if (x instanceof Vector3D && typeof y == 'undefined' && typeof z == 'undefined') {
+        } else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
             this.x *= x.x;
             this.y *= x.y;
             this.z *= x.z;
@@ -75,16 +87,16 @@ export class Vector3 {
         return this;
     }
 
-    times(x: number | Vector3D, y?: number | undefined, z?: number | undefined): Vector3 {
+    times(x: number | Vector3, y?: number | undefined, z?: number | undefined): Vector3 {
         return this.clone().multiply(x, y, z);
     }
 
-    divide(x: number | Vector3D, y?: number | undefined, z?: number | undefined): this {
+    divide(x: number | Vector3, y?: number | undefined, z?: number | undefined): this {
         if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
             this.x /= x;
             this.y /= y;
             this.z /= z;
-        } else if (x instanceof Vector3D && typeof y == 'undefined' && typeof z == 'undefined') {
+        } else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
             this.x /= x.x;
             this.y /= x.y;
             this.z /= x.z;
@@ -99,11 +111,11 @@ export class Vector3 {
         return this;
     }
 
-    over(x: number | Vector3D, y?: number | undefined, z?: number | undefined): Vector3 {
+    over(x: number | Vector3, y?: number | undefined, z?: number | undefined): Vector3 {
         return this.clone().divide(x, y, z);
     }
 
-    dot(vector: Vector3D): number {
+    dot(vector: Vector3): number {
         return this.x * vector.x + this.y * vector.y + this.z * vector.z;
     }
 
@@ -147,14 +159,14 @@ export class Vector3 {
         );
     }
 
-    equals(other: Vector3D, epsilon?: number): boolean {
+    equals(other: Vector3, epsilon?: number): boolean {
         if (typeof epsilon == 'number') return Math.abs(this.x - other.x) <= epsilon && Math.abs(this.y - other.y) <= epsilon && Math.abs(this.z - other.z) <= epsilon;
         else return this.x == other.x && this.y == other.y && this.z == other.z;
     }
 }
 
 export namespace Vector3 {
-    class HandledVector3 implements Vector3 {
+    export class Handled implements Vector3 {
         private listeners: ((original: Vector3, current: Vector3) => unknown)[];
 
         constructor(private vector: Vector3, ...listeners: ((original: Vector3, current: Vector3) => unknown)[]) {
@@ -165,6 +177,12 @@ export namespace Vector3 {
             for (const listener of this.listeners) {
                 listener(original, this);
             }
+        }
+
+        on(event: "change", listener: (original: Vector3, current: Vector3) => unknown): this {
+            this.listeners.push(listener);
+
+            return this;
         }
 
         get x() {
@@ -191,7 +209,17 @@ export namespace Vector3 {
             this.vector.z = value;
         }
 
-        add(x: number | Vector3D, y?: number | undefined, z?: number | undefined): this {
+        set(x: number | Vector3, y?: number | undefined, z?: number | undefined): this {
+            const original = this.vector.clone();
+
+            this.vector.set(x, y, z);
+
+            this.sendUpdate(original);
+
+            return this;
+        }
+
+        add(x: number | Vector3, y?: number | undefined, z?: number | undefined): this {
             const original = this.vector.clone();
 
             this.vector.add(x, y, z);
@@ -201,11 +229,11 @@ export namespace Vector3 {
             return this;
         }
 
-        plus(x: number | Vector3D, y?: number | undefined, z?: number | undefined): Vector3 {
+        plus(x: number | Vector3, y?: number | undefined, z?: number | undefined): Vector3 {
             return this.vector.plus(x, y, z);
         }
 
-        subtract(x: number | Vector3D, y?: number | undefined, z?: number | undefined): this {
+        subtract(x: number | Vector3, y?: number | undefined, z?: number | undefined): this {
             const original = this.vector.clone();
 
             this.vector.subtract(x, y, z);
@@ -215,11 +243,11 @@ export namespace Vector3 {
             return this;
         }
 
-        minus(x: number | Vector3D, y?: number | undefined, z?: number | undefined): Vector3 {
+        minus(x: number | Vector3, y?: number | undefined, z?: number | undefined): Vector3 {
             return this.vector.minus(x, y, z);
         }
 
-        multiply(x: number | Vector3D, y?: number | undefined, z?: number | undefined): this {
+        multiply(x: number | Vector3, y?: number | undefined, z?: number | undefined): this {
             const original = this.vector.clone();
 
             this.vector.multiply(x, y, z);
@@ -229,11 +257,11 @@ export namespace Vector3 {
             return this;
         }
 
-        times(x: number | Vector3D, y?: number | undefined, z?: number | undefined): Vector3 {
+        times(x: number | Vector3, y?: number | undefined, z?: number | undefined): Vector3 {
             return this.vector.times(x, y, z);
         }
 
-        divide(x: number | Vector3D, y?: number | undefined, z?: number | undefined): this {
+        divide(x: number | Vector3, y?: number | undefined, z?: number | undefined): this {
             const original = this.vector.clone();
 
             this.vector.divide(x, y, z);
@@ -243,11 +271,11 @@ export namespace Vector3 {
             return this;
         }
 
-        over(x: number | Vector3D, y?: number | undefined, z?: number | undefined): Vector3 {
+        over(x: number | Vector3, y?: number | undefined, z?: number | undefined): Vector3 {
             return this.vector.over(x, y, z);
         }
 
-        dot(vector: Vector3D): number {
+        dot(vector: Vector3): number {
             return this.vector.dot(vector);
         }
 
@@ -287,18 +315,40 @@ export namespace Vector3 {
             return this.vector.toString();
         }
 
-        equals(other: Vector3D, epsilon?: number): boolean {
+        equals(other: Vector3, epsilon?: number): boolean {
             return this.vector.equals(other, epsilon);
         }
     }
 
-    export function handle(vector: Vector3): Vector3 {
-        return new HandledVector3(vector);
+    export function handle(vector: Vector3): Vector3.Handled {
+        return new Handled(vector);
     }
 
     export function immutable(vector: Vector3): Vector3 {
-        return new HandledVector3(vector, () => {
+        return new Handled(vector, () => {
             throw new Error("Cannot modify immutable vector");
         });
+    }
+
+    export function validated(vector: Vector3): Vector3 {
+        return new Handled(vector, (original, current) => {
+            if (typeof current.x !== 'number' || isNaN(current.x) || typeof current.y !== 'number' || isNaN(current.y) || typeof current.z !== 'number' || isNaN(current.z)) {
+                current.set(original);
+
+                console.warn("Invalid vector components " + current + ", reverting to " + original);
+            }
+        });
+    }
+
+    export function floor(vector: Vector3): Vector3 {
+        return new Vector3(Math.floor(vector.x), Math.floor(vector.y), Math.floor(vector.z));
+    }
+
+    export function ceil(vector: Vector3): Vector3 {
+        return new Vector3(Math.ceil(vector.x), Math.ceil(vector.y), Math.ceil(vector.z));
+    }
+
+    export function round(vector: Vector3): Vector3 {
+        return new Vector3(Math.round(vector.x), Math.round(vector.y), Math.round(vector.z));
     }
 }

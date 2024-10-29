@@ -1,31 +1,22 @@
-import { MutableVector3D } from "../../utils/vector3d/mutable-vector3d.js";
-import { Vector3D } from "../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../utils/vector3d/vector3.js";
 import { RayIntersectable } from "../raycast/ray-intersectable.js";
 import { RayWalker } from "../raycast/ray-walker.js";
 
 export class PhysicalHitbox implements RayIntersectable {
-    private position: Vector3D;
-    private size: Vector3D;
+    private position: Vector3;
+    private size: Vector3;
 
-    constructor(position: Vector3D, size: Vector3D) {
-        this.position = new MutableVector3D(position);
-        this.size = new MutableVector3D(size);
+    constructor(position: Vector3, size: Vector3) {
+        this.position = Vector3.immutable(position.clone());
+        this.size = Vector3.immutable(size.clone());
     }
 
-    getPosition(): Vector3D {
-        return this.position.clone();
+    getPosition(): Vector3 {
+        return this.position;
     }
 
-    setPosition(position: Vector3D): void {
-        this.position = position;
-    }
-
-    getSize(): Vector3D {
-        return this.size.clone();
-    }
-
-    setSize(size: Vector3D): void {
-        this.size = size;
+    getSize(): Vector3 {
+        return this.size;
     }
 
     getIntersection(rayWalker: RayWalker): number | null {

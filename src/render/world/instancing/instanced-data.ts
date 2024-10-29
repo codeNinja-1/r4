@@ -1,6 +1,4 @@
-import { ImmutableVector2D } from "../../../utils/vector2d/immutable-vector2d.js";
-import { ImmutableVector3D } from "../../../utils/vector3d/immutable-vector3d.js";
-import { Vector3D } from "../../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../../utils/vector3d/vector3.js";
 import { ChunkDataReferencer } from "../../../world/chunk-data/chunk-data-referencer.js";
 import { ChunkData } from "../../../world/chunk-data/chunk-data.js";
 import { BlockPosition } from "../../../world/prototype/block-position.js";
@@ -15,15 +13,15 @@ export abstract class InstancedData {
     }
 
     private static readonly cullDirections = [
-        new ImmutableVector3D(-1, 0, 0),
-        new ImmutableVector3D(1, 0, 0),
-        new ImmutableVector3D(0, -1, 0),
-        new ImmutableVector3D(0, 1, 0),
-        new ImmutableVector3D(0, 0, -1),
-        new ImmutableVector3D(0, 0, 1)
+        new Vector3(-1, 0, 0),
+        new Vector3(1, 0, 0),
+        new Vector3(0, -1, 0),
+        new Vector3(0, 1, 0),
+        new Vector3(0, 0, -1),
+        new Vector3(0, 0, 1)
     ];
 
-    private canCull(position: Vector3D): boolean {
+    private canCull(position: Vector3): boolean {
         for (const direction of InstancedData.cullDirections) {
             const neighbor = position.clone().add(direction);
 
@@ -178,6 +176,6 @@ export abstract class InstancedData {
         }
     }
 
-    private static VERIFY_CALLS = true;
-    private static LOG_CULLING = true;
+    private static VERIFY_CALLS = false;
+    private static LOG_CULLING = false;
 }

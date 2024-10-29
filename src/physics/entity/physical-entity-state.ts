@@ -1,22 +1,21 @@
-import { MutableVector3D } from "../../utils/vector3d/mutable-vector3d.js";
-import { Vector3D } from "../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../utils/vector3d/vector3.js";
 
 export class PhysicalEntityState {
-    private velocity: Vector3D = new MutableVector3D();
+    private velocity: Vector3 = new Vector3();
 
-    getVelocity(): Vector3D {
+    getVelocity(): Vector3 {
         return this.velocity.clone();
     }
 
-    setVelocity(velocity: Vector3D) {
+    setVelocity(velocity: Vector3) {
         this.velocity.set(velocity);
     }
 
-    applyForce(force: Vector3D) {
+    applyForce(force: Vector3) {
         this.velocity.add(force);
     }
 
-    applyFriction(friction: Vector3D) {
-        this.velocity.scalarMultiply(friction);
+    applyFriction(friction: Vector3) {
+        this.velocity.multiply(friction);
     }
 }

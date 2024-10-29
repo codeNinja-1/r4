@@ -1,8 +1,7 @@
 import { PhysicalEntityProperties } from "../../physics/entity/physical-entity-properties.js";
 import { PhysicalEntityState } from "../../physics/entity/physical-entity-state.js";
 import { Rotation } from "../../utils/rotation/rotation.js";
-import { HandleableVector3D } from "../../utils/vector3d/handleable-vector3d.js";
-import { Vector3D } from "../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../utils/vector3d/vector3.js";
 import { ChunkDataReferencer } from "../chunk-data/chunk-data-referencer.js";
 import { ChunkInterface } from "../chunk-interface.js";
 import { EntityPrototype } from "../prototype/entity-prototype.js";
@@ -15,7 +14,7 @@ export abstract class BaseEntity implements Entity {
     private chunk: ChunkInterface | null;
     private world: World | null;
 
-    private position: HandleableVector3D = new HandleableVector3D();
+    private position: Vector3.Handled = Vector3.handle(new Vector3());
     private rotation: Rotation = new Rotation();
 
     constructor() {
@@ -37,7 +36,11 @@ export abstract class BaseEntity implements Entity {
                     let chunk = this.world.getChunk(targetChunkX, targetChunkZ);
 
                     if (!chunk) {
-                        chunk = this.world.loadChunk(targetChunkX, targetChunkZ);;
+                        chunk = this.world.loadChunk(targetChunkX, targetChunkZ);
+                    }
+
+                    if (chunk.loadState.current != Infinity) {
+                        chunk.loadState.target = Infinity;
                     }
 
                     // Update the chunk the entity is in.
@@ -96,28 +99,12 @@ export abstract class BaseEntity implements Entity {
     async tickEntity(delta: number): Promise<void> {
     }
 
-    getPosition(): HandleableVector3D {
+    getPosition(): Vector3 {
         return this.position;
-    }
-
-    setPosition(x: number, y: number, z: number): void;
-    setPosition(position: Vector3D): void;
-    setPosition(x: Vector3D | number, y?: number, z?: number): void {
-        if (x instanceof Vector3D) {
-            this.position.set(x.x, x.y, x.z);
-        } else if (typeof y == 'number' && typeof z == 'number') {
-            this.position.set(x, y, z);
-        } else {
-            throw new Error("Invalid arguments to BaseEntity.setPosition()");
-        }
     }
 
     getRotation(): Rotation {
         return this.rotation;
-    }
-
-    setRotation(rotation: Rotation): void {
-        this.rotation = rotation;
     }
 
     getUniqueId(): string {

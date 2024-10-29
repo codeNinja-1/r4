@@ -11,6 +11,7 @@ export abstract class BaseRenderPass implements RenderPass {
     private bindGroupManager: PipelineBindGroupManager;
     private device: GraphicsDevice;
     protected depthTest: boolean = false;
+    protected alpha: boolean = false;
 
     setBindGroupManager(bindGroupManager: BindGroupManager) {
         this.bindGroupManager = new PipelineBindGroupManager(bindGroupManager);
@@ -55,11 +56,30 @@ export abstract class BaseRenderPass implements RenderPass {
     }
 
     protected addFragmentStage(module: ShaderModule, entryPoint: string) {
+        let target: GPUColorTargetState = {
+            format: navigator.gpu.getPreferredCanvasFormat()
+        };
+
+        if (this.alpha) {
+            target.blend = {
+                color: {
+                    srcFactor: "src-alpha",
+                    dstFactor: "one-minus-src-alpha",
+                    operation: "add"
+                },
+                alpha: {
+                    srcFactor: "src-alpha",
+                    dstFactor: "one-minus-src-alpha",
+                    operation: "add"
+                }
+            };
+        }
+
         this.descriptor.fragment = {
             module: module.getShaderModule(),
             entryPoint,
             targets: [
-                { format: navigator.gpu.getPreferredCanvasFormat() }
+                target
             ]   
         };
     }

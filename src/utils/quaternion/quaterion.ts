@@ -1,6 +1,5 @@
 import { Rotation } from "../rotation/rotation.js";
-import { MutableVector3D } from "../vector3d/mutable-vector3d.js";
-import { Vector3D } from "../vector3d/vector3d.js";
+import { Vector3 } from "../vector3d/vector3.js";
 
 export class Quaternion {
     constructor(private x: number = 0, private y: number = 0, private z: number = 0, private w: number = 0) {
@@ -38,20 +37,20 @@ export class Quaternion {
         return new Quaternion(x, y, z, w);
     }
 
-    rotate(vector: Vector3D): Vector3D {
-        let quaternion = new Quaternion(0, vector.x, vector.y, vector.z);
+    rotate(vector: Vector3): Vector3 {
+        let quaternion = new Quaternion(vector.x, vector.y, vector.z, 0);
         let inverse = this.clone().inverse();
-        let result = this.clone().multiply(quaternion).multiply(inverse);
+        let result = this.times(quaternion).multiply(inverse);
 
-        return new MutableVector3D(result.x, result.y, result.z);
+        return new Vector3(result.x, result.y, result.z);
     }
 
-    inverseRotate(vector: Vector3D): Vector3D {
-        let quaternion = new Quaternion(0, vector.x, vector.y, vector.z);
+    inverseRotate(vector: Vector3): Vector3 {
+        let quaternion = new Quaternion(vector.x, vector.y, vector.z, 0);
         let inverse = this.clone().inverse();
         let result = inverse.multiply(quaternion).multiply(this);
 
-        return new MutableVector3D(result.x, result.y, result.z);
+        return new Vector3(result.x, result.y, result.z);
     }
 
     clone(): Quaternion {
@@ -66,11 +65,11 @@ export class Quaternion {
         return this.x === other.x && this.y === other.y && this.z === other.z && this.w === other.w;
     }
 
-    static fromAxisAngle(axis: Vector3D, angle: number): Quaternion {
+    static fromAxisAngle(axis: Vector3, angle: number): Quaternion {
         let cos = Math.cos(angle / 2);
         let sin = Math.sin(angle / 2);
 
-        return new Quaternion(cos, axis.x * sin, axis.y * sin, axis.z * sin);
+        return new Quaternion(axis.x * sin, axis.y * sin, axis.z * sin, cos);
     }
 
     static fromRotation(rotation: Rotation): Quaternion {

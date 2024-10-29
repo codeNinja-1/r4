@@ -5,8 +5,7 @@ import { PhysicalEntityState } from "../../../physics/entity/physical-entity-sta
 import { BoxPhysicalComponent } from "../../../physics/model/component/box-physical-component.js";
 import { PhysicalHitbox } from "../../../physics/model/physical-hitbox.js";
 import { PhysicalModel } from "../../../physics/model/physical-model.js";
-import { ImmutableVector3D } from "../../../utils/vector3d/immutable-vector3d.js";
-import { Vector3D } from "../../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../../utils/vector3d/vector3.js";
 import { BaseEntity } from "../../../world/entity/base-entity.js";
 import { EntityPrototype } from "../../../world/prototype/entity-prototype.js";
 
@@ -15,14 +14,14 @@ export class PlayerEntity extends BaseEntity {
     private physicalProperties: PhysicalEntityProperties | null = {
         gravity: -0.3,
         friction: {
-            air: 0.01,
-            ground: 0.5
+            air: 0.9,
+            ground: 0.8
         },
         model: new PhysicalModel(
             new BoxPhysicalComponent(
                 new PhysicalHitbox(
-                    new ImmutableVector3D(0, 0, 0),
-                    new ImmutableVector3D(1, 1.8, 1)
+                    new Vector3(0, 0, 0),
+                    new Vector3(1, 1.8, 1)
                 )
             )
         )

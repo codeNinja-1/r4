@@ -1,4 +1,3 @@
-import { Vector3D } from "../vector3d/vector3d.js";
 import { Vector2D } from "./vector2d.js";
 
 export class MutableVector2D extends Vector2D {
@@ -23,9 +22,5 @@ export class MutableVector2D extends Vector2D {
         } else {
             return this.set(x.x, x.y);
         }
-    }
-
-    static from(vector: Vector3D, format: string) {
-        return new MutableVector2D(...Vector2D._from(vector, format));
     }
 }

@@ -40,7 +40,7 @@ export abstract class RenderWorldMirror<M extends RenderChunkMirror> {
             for (let z = perspectiveLocation.y - renderDistance; z <= perspectiveLocation.y + renderDistance; z++) {
                 const chunk = world.getChunk(x, z);
 
-                if (!chunk || chunk.isPlaceholder()) {
+                if (!chunk || chunk.loadState.current != Infinity) {
                     continue;
                 }
 

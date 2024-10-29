@@ -1,6 +1,4 @@
-import { ImmutableVector3D } from "../../utils/vector3d/immutable-vector3d.js";
-import { MutableVector3D } from "../../utils/vector3d/mutable-vector3d.js";
-import { Vector3D } from "../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../utils/vector3d/vector3.js";
 
 /**
  * A `ChunkDataReferencer` converts between indexes and
@@ -21,7 +19,7 @@ export namespace ChunkDataReferencer {
     /**
      * The dimensions of the chunk as a 3D vector.
      */
-    export const dimensions: Vector3D = new ImmutableVector3D(16, 64, 16);
+    export const dimensions: Vector3 = Vector3.immutable(new Vector3(16, 64, 16));
 
     /**
      * Returns the total number of cells in a chunk.
@@ -37,9 +35,9 @@ export namespace ChunkDataReferencer {
      * The method is the opposite of `position()`.
      */
     export function index(x: number, y: number, z: number): number;
-    export function index(x: Vector3D): number;
-    export function index(x: number | Vector3D, y?: number, z?: number): number {
-        if (x instanceof Vector3D) {
+    export function index(x: Vector3): number;
+    export function index(x: number | Vector3, y?: number, z?: number): number {
+        if (x instanceof Vector3) {
             y = x.y;
             z = x.z;
             x = x.x;
@@ -90,11 +88,11 @@ export namespace ChunkDataReferencer {
      * 
      * The method is the opposite of `index()`.
      */
-    export function position(index: number): Vector3D {
-        return new MutableVector3D(this.x(index), this.y(index), this.z(index));
+    export function position(index: number): Vector3 {
+        return new Vector3(this.x(index), this.y(index), this.z(index));
     }
 
-    export function isOutOfBounds(position: Vector3D): boolean {
+    export function isOutOfBounds(position: Vector3): boolean {
         return position.x < 0 || position.x >= this.dimensions.x || position.y < 0 || position.y >= this.dimensions.y || position.z < 0 || position.z >= this.dimensions.z;
     }
 }

@@ -28,7 +28,8 @@ export class GraphicsDevice {
 
         this.context.configure({
             device: this.device,
-            format: navigator.gpu.getPreferredCanvasFormat()
+            format: navigator.gpu.getPreferredCanvasFormat(),
+            alphaMode: 'premultiplied'
         });
     }
 

@@ -1,13 +1,12 @@
-import { ImmutableVector3D } from "../../utils/vector3d/immutable-vector3d.js";
-import { Vector3D } from "../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../utils/vector3d/vector3.js";
 
 export class Ray {
-    private start: Vector3D;
-    private direction: Vector3D;
+    private start: Vector3;
+    private direction: Vector3;
 
-    constructor(start: Vector3D, direction: Vector3D) {
-        this.start = new ImmutableVector3D(start);
-        this.direction = new ImmutableVector3D(direction);
+    constructor(start: Vector3, direction: Vector3) {
+        this.start = Vector3.immutable(start.clone());
+        this.direction = Vector3.immutable(direction.clone());
     }
 
     getStart() {

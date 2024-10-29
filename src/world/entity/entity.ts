@@ -2,8 +2,7 @@ import { PhysicalEntityProperties } from "../../physics/entity/physical-entity-p
 import { PhysicalEntityState } from "../../physics/entity/physical-entity-state.js";
 import { DynamicModel } from "../../render/world/model/dynamic/dynamic-model.js";
 import { Rotation } from "../../utils/rotation/rotation.js";
-import { HandleableVector3D } from "../../utils/vector3d/handleable-vector3d.js";
-import { Vector3D } from "../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../utils/vector3d/vector3.js";
 import { ChunkInterface } from "../chunk-interface.js";
 import { EntityPrototype } from "../prototype/entity-prototype.js";
 import { World } from "../world.js";
@@ -19,12 +18,9 @@ export interface Entity {
 
     canLoadChunks(): boolean;
 
-    getPosition(): HandleableVector3D;
-    setPosition(x: number, y: number, z: number): void;
-    setPosition(position: Vector3D): void;
+    getPosition(): Vector3;
 
     getRotation(): Rotation;
-    setRotation(rotation: Rotation): void;
 
     getPrototype(): EntityPrototype<Entity>;
 

@@ -1,18 +1,9 @@
-import { MutableVector3D } from "../../../../../utils/vector3d/mutable-vector3d.js";
-import { Vector3D } from "../../../../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../../../../utils/vector3d/vector3.js";
 import { ModelComponent } from "../model-component.js";
 import { EmptyModelComponent } from "./empty-model-component.js";
 
 export class TranslatedModelComponent implements ModelComponent {
-    constructor(private position: Vector3D = new MutableVector3D(), private child: ModelComponent = new EmptyModelComponent()) {
-    }
-
-    getPosition(): Vector3D {
-        return this.position.clone();
-    }
-
-    setPosition(position: Vector3D): void {
-        this.position.set(position);
+    constructor(private position: Vector3 = new Vector3(), private child: ModelComponent = new EmptyModelComponent()) {
     }
 
     add(child: ModelComponent): void {

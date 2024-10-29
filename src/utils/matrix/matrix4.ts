@@ -1,8 +1,6 @@
 import { Axis } from "../rotation/axis.js";
 import { Rotation } from "../rotation/rotation.js";
-import { ImmutableVector3D } from "../vector3d/immutable-vector3d.js";
-import { MutableVector3D } from "../vector3d/mutable-vector3d.js";
-import { Vector3D } from "../vector3d/vector3d.js";
+import { Vector3 } from "../vector3d/vector3.js";
 import { Matrix3 } from "./matrix3.js";
 
 export class Matrix4 {
@@ -25,10 +23,10 @@ export class Matrix4 {
         }
     }
 
-    multiply(vector: Vector3D): Vector3D;
+    multiply(vector: Vector3): Vector3;
     multiply(matrix: Matrix4): ThisType<Matrix4>;
-    multiply(value: Vector3D | Matrix4): Vector3D | ThisType<Matrix4> {
-        if (value instanceof Vector3D) {
+    multiply(value: Vector3 | Matrix4): Vector3 | ThisType<Matrix4> {
+        if (value instanceof Vector3) {
             return Matrix4.multiplyVector(this, value);
         } else if (value instanceof Matrix4) {
             return Matrix4.multiply(this, value, this);
@@ -37,11 +35,11 @@ export class Matrix4 {
         }
     }
 
-    get translation(): Vector3D {
-        return new ImmutableVector3D(this.data[12], this.data[13], this.data[14]);
+    get translation(): Vector3 {
+        return new Vector3(this.data[12], this.data[13], this.data[14]);
     }
 
-    set translation(value: Vector3D) {
+    set translation(value: Vector3) {
         this.data[12] = value.x;
         this.data[13] = value.y;
         this.data[14] = value.z;
@@ -82,7 +80,7 @@ export class Matrix4 {
         return target;
     }
 
-    static multiplyVector(matrix: Matrix4, vector: Vector3D, target: Vector3D = new MutableVector3D()) {
+    static multiplyVector(matrix: Matrix4, vector: Vector3, target: Vector3 = new Vector3()) {
         const a = matrix.data;
         const b = vector;
         const c = target;
@@ -144,7 +142,7 @@ export class Matrix4 {
         return target;
     }
 
-    static createTranslation(vector: Vector3D, target: Matrix4 = new Matrix4()) {
+    static createTranslation(vector: Vector3, target: Matrix4 = new Matrix4()) {
         target.data[0] = 1;
         target.data[1] = 0;
         target.data[2] = 0;
@@ -168,7 +166,7 @@ export class Matrix4 {
         return target;
     }
 
-    static createScale(vector: Vector3D, target: Matrix4 = new Matrix4()) {
+    static createScale(vector: Vector3, target: Matrix4 = new Matrix4()) {
         target.data[0] = vector.x;
         target.data[1] = 0;
         target.data[2] = 0;

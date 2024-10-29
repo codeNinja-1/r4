@@ -1,13 +1,12 @@
-import { MutableVector3D } from "../../utils/vector3d/mutable-vector3d.js";
-import { Vector3D } from "../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../utils/vector3d/vector3.js";
 import { Ray } from "../raycast/ray.js";
 
 export class RayWalker {
     private distance: number = 0;
-    private position: Vector3D;
+    private position: Vector3;
 
-    constructor(private ray: Ray, position?: Vector3D) {
-        this.position = new MutableVector3D(position ?? this.ray.getStart());
+    constructor(private ray: Ray, position?: Vector3) {
+        this.position = (position ?? this.ray.getStart()).clone();
     }
 
     getDistance() {
@@ -24,9 +23,11 @@ export class RayWalker {
 
     walk(distance: number) {
         this.distance += distance;
-        this.position.set(this.ray.getDirection());
-        this.position.scalarMultiply(distance);
-        this.position.add(this.ray.getStart());
+        
+        this.position
+            .set(this.ray.getDirection())
+            .multiply(distance)
+            .add(this.ray.getStart());
     }
 
     clone() {

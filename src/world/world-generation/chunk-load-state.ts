@@ -1,0 +1,1 @@
+export type ChunkLoadState = { current: number, target: number };

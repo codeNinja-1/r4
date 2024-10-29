@@ -219,5 +219,5 @@ export class MeshAssembler {
         return { texturePositions, texture };
     }
 
-    private static PRINT_OUTPUT = true;
+    private static PRINT_OUTPUT = false;
 }

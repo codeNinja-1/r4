@@ -1,4 +1,3 @@
-import { Vector3D } from "../vector3d/vector3d.js";
 import { MutableVector2D } from "./mutable-vector2d.js";
 import { Vector2D } from "./vector2d.js";
 
@@ -37,9 +36,5 @@ export class HandleableVector2D extends MutableVector2D {
 
     clone(): this {
         throw new Error("Cannot clone handleable vector. Instead use immutable() or mutable() to output a non-handlable vector.");
-    }
-
-    static from(vector: Vector3D, format: string) {
-        return new HandleableVector2D(...Vector2D._from(vector, format));
     }
 }

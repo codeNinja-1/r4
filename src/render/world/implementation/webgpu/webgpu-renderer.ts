@@ -38,7 +38,7 @@ export class WebGPURenderer implements WorldRenderer {
         terrainRenderPass.setBindGroupManager(this.bindGroupManager);
 
         this.passes = [
-            new ClearRenderPass(new Color(0, 0.1, 0.2, 1)),
+            new ClearRenderPass(new Color(0, 0, 0, 1)),
             terrainRenderPass
         ];
     }

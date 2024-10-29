@@ -1,6 +1,7 @@
 import { Vector2D } from "../utils/vector2d/vector2d.js";
 import { ChunkData } from "./chunk-data/chunk-data.js";
 import { ChunkInterface } from "./chunk-interface.js";
+import { ChunkLoadState } from "./world-generation/chunk-load-state.js";
 import { World } from "./world.js";
 
 export class PlaceholderChunk extends ChunkInterface.Placeholder {
@@ -15,10 +16,8 @@ export class PlaceholderChunk extends ChunkInterface.Placeholder {
         return this.position;
     }
 
-    getWorld(): World {
-        if (!this.world) throw new Error("Cannot get world of unbound chunk");
-
-        return this.world;
+    getWorld(): World | null {
+        return this.world ?? null;
     }
 
     getChunkData(): ChunkData {
@@ -33,4 +32,9 @@ export class PlaceholderChunk extends ChunkInterface.Placeholder {
     unloadChunk(): void {}
     setupChunk(): void {}
     async tickChunk(): Promise<void> {}
+
+    loadState = {
+        current: 0,
+        target: 0
+    };
 }

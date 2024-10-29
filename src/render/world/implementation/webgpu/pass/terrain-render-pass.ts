@@ -14,6 +14,7 @@ export class TerrainRenderPass extends BaseRenderPass {
     private indirectDrawBuffer: GPUBuffer;
     private chunkPositionBuffer: GPUBuffer;
     protected depthTest = true;
+    protected depthBufferFactor = 0.0;
     
     constructor(private worldMirror: WebGPUWorldMirror) {
         super();
@@ -52,6 +53,10 @@ export class TerrainRenderPass extends BaseRenderPass {
         await this.setupChunkPositionBindings(terrainBindGroup, device);
 
         this.getBindGroupManager().useBindGroup(terrainBindGroup);
+
+        // const configureBindGroup = new BindGroup(2);
+
+        // configureBindGroup.addEntry(0, new );
     }
 
     private async setupGeometryBindings(bindGroup: BindGroup, device: GraphicsDevice) {

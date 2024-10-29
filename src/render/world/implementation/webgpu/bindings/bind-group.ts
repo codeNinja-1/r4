@@ -90,5 +90,5 @@ export class BindGroup {
         return this.group;
     }
 
-    private static LOGGING = true;
+    private static LOGGING = false;
 }

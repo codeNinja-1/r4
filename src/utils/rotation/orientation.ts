@@ -1,7 +1,7 @@
 import { Matrix3 } from "../matrix/matrix3.js";
 import { Rotation } from "./rotation.js";
 
-export enum Orientation { North, East, South, West, Up, Down }
+export enum Orientation { North = 0, East = 1, South = 2, West = 3, Up = 4, Down = 5 }
 
 export namespace Orientation {
     const rotations: Map<Orientation, Rotation> = new Map();
@@ -12,6 +12,17 @@ export namespace Orientation {
         }
 
         return rotations.get(orientation)!;
+    }
+
+    export function toId(orientation: Orientation): string {
+        switch (orientation) {
+            case Orientation.North: return 'north';
+            case Orientation.East: return 'east';
+            case Orientation.South: return 'south';
+            case Orientation.West: return 'west';
+            case Orientation.Up: return 'up';
+            case Orientation.Down: return 'down';
+        }
     }
 
     function calculateRotation(orientation: Orientation): Rotation {

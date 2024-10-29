@@ -1,15 +1,9 @@
-import { Orientation } from "../../../../../utils/rotation/orientation.js";
-import { Rotation } from "../../../../../utils/rotation/rotation.js";
-import { ImmutableVector2D } from "../../../../../utils/vector2d/immutable-vector2d.js";
-import { ImmutableVector3D } from "../../../../../utils/vector3d/immutable-vector3d.js";
-import { Vector3D } from "../../../../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../../../../utils/vector3d/vector3.js";
 import { Texture } from "../../../../utils/texture.js";
 import { ModelComponent } from "../model-component.js";
-import { GroupModelComponent } from "./group-model-component.js";
-import { PlaneModelComponent } from "./plane-model-component.js";
 
 export class BoxModelComponent implements ModelComponent {
-    constructor(private dimensions: Vector3D, private textures: Texture[]) {
+    constructor(private dimensions: Vector3, private textures: Texture[]) {
     }
 
     getVertexPositions(): Float32Array {

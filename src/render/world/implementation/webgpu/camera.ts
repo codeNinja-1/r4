@@ -1,5 +1,5 @@
 import { Matrix4 } from "../../../../utils/matrix/matrix4.js";
-import { ImmutableVector3D } from "../../../../utils/vector3d/immutable-vector3d.js";
+import { Vector3 } from "../../../../utils/vector3d/vector3.js";
 import { Perspective } from "../../pespective/perspective.js";
 import { Projector } from "../../pespective/projector.js";
 import { Bindings } from "./bindings.js";
@@ -54,12 +54,12 @@ export class Camera {
 
         data.set(cameraMatrix.data, 0);
 
-        if (Camera.TEST_PROJECTION) console.log(Matrix4.multiplyVector(cameraMatrix, new ImmutableVector3D(0, 0, 0)));
+        if (Camera.TEST_PROJECTION) console.log(Matrix4.multiplyVector(cameraMatrix, new Vector3(0, 0, 0)));
         if (Camera.TEST_VIEW) {
             console.log(
-                Matrix4.multiplyVector(viewMatrix, new ImmutableVector3D(0, 0, 0)),
-                Matrix4.multiplyVector(viewMatrix, new ImmutableVector3D(1, 0, 0)),
-                Matrix4.multiplyVector(viewMatrix, new ImmutableVector3D(0, 0, 1))
+                Matrix4.multiplyVector(viewMatrix, new Vector3(0, 0, 0)),
+                Matrix4.multiplyVector(viewMatrix, new Vector3(1, 0, 0)),
+                Matrix4.multiplyVector(viewMatrix, new Vector3(0, 0, 1))
             );
         }
 

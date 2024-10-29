@@ -1,5 +1,3 @@
-import { Vector3D } from "../vector3d/vector3d.js";
-
 export abstract class Vector2D {
     x: number;
     y: number;
@@ -159,11 +157,6 @@ export abstract class Vector2D {
 
     clone() {
         return new (this.constructor as (new (x: number, y: number) => typeof this))(this.x, this.y);
-    }
-
-    static *_from(vector: Vector3D, format: string) {
-        yield format[0] == 'x' ? vector.x : format[0] == 'y' ? vector.y : format[0] == 'z' ? vector.z : format[0] == '1' ? 1 : 0;
-        yield format[1] == 'x' ? vector.x : format[1] == 'y' ? vector.y : format[1] == 'z' ? vector.z : format[1] == '1' ? 1 : 0;
     }
 
     equals(other: Vector2D) {

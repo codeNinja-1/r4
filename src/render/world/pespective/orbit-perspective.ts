@@ -3,14 +3,14 @@ import { Matrix4 } from "../../../utils/matrix/matrix4.js";
 import { Rotation } from "../../../utils/rotation/rotation.js";
 import { ImmutableVector2D } from "../../../utils/vector2d/immutable-vector2d.js";
 import { Vector2D } from "../../../utils/vector2d/vector2d.js";
-import { Vector3D } from "../../../utils/vector3d/vector3d.js";
+import { Vector3 } from "../../../utils/vector3d/vector3.js";
 import { ChunkDataReferencer } from "../../../world/chunk-data/chunk-data-referencer.js";
 import { Entity } from "../../../world/entity/entity.js";
 import { Perspective } from "./perspective.js";
 
 export class OrbitPerspective implements Perspective {
     private matrix: Matrix4;
-    private location: Vector3D;
+    private location: Vector3;
     private rotation: Rotation;
     private chunkLocation: Vector2D;
     private mousePosition: Vector2D;
@@ -29,7 +29,7 @@ export class OrbitPerspective implements Perspective {
     }
 
     private computeLocation(mousePosition: Vector2D) {
-        let location = this.entity.getPosition().mutable();
+        let location = this.entity.getPosition().clone();
 
         let angleX = -(mousePosition.x - window.innerWidth / 2) / window.innerWidth * 2 * Math.PI;
         let angleY = -(mousePosition.y - window.innerHeight / 2) / window.innerHeight * Math.PI;

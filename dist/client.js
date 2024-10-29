@@ -1,3 +1,148 @@
+var murmurhashJs = {exports: {}};
+
+var murmurhash3_gc = {exports: {}};
+
+/**
+ * JS Implementation of MurmurHash3 (r136) (as of May 20, 2011)
+ * 
+ * @author <a href="mailto:gary.court@gmail.com">Gary Court</a>
+ * @see http://github.com/garycourt/murmurhash-js
+ * @author <a href="mailto:aappleby@gmail.com">Austin Appleby</a>
+ * @see http://sites.google.com/site/murmurhash/
+ * 
+ * @param {string} key ASCII only
+ * @param {number} seed Positive integer only
+ * @return {number} 32-bit positive integer hash 
+ */
+
+(function (module) {
+	function murmurhash3_32_gc(key, seed) {
+		var remainder, bytes, h1, h1b, c1, c2, k1, i;
+		
+		remainder = key.length & 3; // key.length % 4
+		bytes = key.length - remainder;
+		h1 = seed;
+		c1 = 0xcc9e2d51;
+		c2 = 0x1b873593;
+		i = 0;
+		
+		while (i < bytes) {
+		  	k1 = 
+		  	  ((key.charCodeAt(i) & 0xff)) |
+		  	  ((key.charCodeAt(++i) & 0xff) << 8) |
+		  	  ((key.charCodeAt(++i) & 0xff) << 16) |
+		  	  ((key.charCodeAt(++i) & 0xff) << 24);
+			++i;
+			
+			k1 = ((((k1 & 0xffff) * c1) + ((((k1 >>> 16) * c1) & 0xffff) << 16))) & 0xffffffff;
+			k1 = (k1 << 15) | (k1 >>> 17);
+			k1 = ((((k1 & 0xffff) * c2) + ((((k1 >>> 16) * c2) & 0xffff) << 16))) & 0xffffffff;
+
+			h1 ^= k1;
+	        h1 = (h1 << 13) | (h1 >>> 19);
+			h1b = ((((h1 & 0xffff) * 5) + ((((h1 >>> 16) * 5) & 0xffff) << 16))) & 0xffffffff;
+			h1 = (((h1b & 0xffff) + 0x6b64) + ((((h1b >>> 16) + 0xe654) & 0xffff) << 16));
+		}
+		
+		k1 = 0;
+		
+		switch (remainder) {
+			case 3: k1 ^= (key.charCodeAt(i + 2) & 0xff) << 16;
+			case 2: k1 ^= (key.charCodeAt(i + 1) & 0xff) << 8;
+			case 1: k1 ^= (key.charCodeAt(i) & 0xff);
+			
+			k1 = (((k1 & 0xffff) * c1) + ((((k1 >>> 16) * c1) & 0xffff) << 16)) & 0xffffffff;
+			k1 = (k1 << 15) | (k1 >>> 17);
+			k1 = (((k1 & 0xffff) * c2) + ((((k1 >>> 16) * c2) & 0xffff) << 16)) & 0xffffffff;
+			h1 ^= k1;
+		}
+		
+		h1 ^= key.length;
+
+		h1 ^= h1 >>> 16;
+		h1 = (((h1 & 0xffff) * 0x85ebca6b) + ((((h1 >>> 16) * 0x85ebca6b) & 0xffff) << 16)) & 0xffffffff;
+		h1 ^= h1 >>> 13;
+		h1 = ((((h1 & 0xffff) * 0xc2b2ae35) + ((((h1 >>> 16) * 0xc2b2ae35) & 0xffff) << 16))) & 0xffffffff;
+		h1 ^= h1 >>> 16;
+
+		return h1 >>> 0;
+	}
+
+	{
+	  module.exports = murmurhash3_32_gc;
+	} 
+} (murmurhash3_gc));
+
+var murmurhash3_gcExports = murmurhash3_gc.exports;
+
+var murmurhash2_gc = {exports: {}};
+
+/**
+ * JS Implementation of MurmurHash2
+ * 
+ * @author <a href="mailto:gary.court@gmail.com">Gary Court</a>
+ * @see http://github.com/garycourt/murmurhash-js
+ * @author <a href="mailto:aappleby@gmail.com">Austin Appleby</a>
+ * @see http://sites.google.com/site/murmurhash/
+ * 
+ * @param {string} str ASCII only
+ * @param {number} seed Positive integer only
+ * @return {number} 32-bit positive integer hash
+ */
+
+(function (module) {
+	function murmurhash2_32_gc(str, seed) {
+	  var
+	    l = str.length,
+	    h = seed ^ l,
+	    i = 0,
+	    k;
+	  
+	  while (l >= 4) {
+	  	k = 
+	  	  ((str.charCodeAt(i) & 0xff)) |
+	  	  ((str.charCodeAt(++i) & 0xff) << 8) |
+	  	  ((str.charCodeAt(++i) & 0xff) << 16) |
+	  	  ((str.charCodeAt(++i) & 0xff) << 24);
+	    
+	    k = (((k & 0xffff) * 0x5bd1e995) + ((((k >>> 16) * 0x5bd1e995) & 0xffff) << 16));
+	    k ^= k >>> 24;
+	    k = (((k & 0xffff) * 0x5bd1e995) + ((((k >>> 16) * 0x5bd1e995) & 0xffff) << 16));
+
+		h = (((h & 0xffff) * 0x5bd1e995) + ((((h >>> 16) * 0x5bd1e995) & 0xffff) << 16)) ^ k;
+
+	    l -= 4;
+	    ++i;
+	  }
+	  
+	  switch (l) {
+	  case 3: h ^= (str.charCodeAt(i + 2) & 0xff) << 16;
+	  case 2: h ^= (str.charCodeAt(i + 1) & 0xff) << 8;
+	  case 1: h ^= (str.charCodeAt(i) & 0xff);
+	          h = (((h & 0xffff) * 0x5bd1e995) + ((((h >>> 16) * 0x5bd1e995) & 0xffff) << 16));
+	  }
+
+	  h ^= h >>> 13;
+	  h = (((h & 0xffff) * 0x5bd1e995) + ((((h >>> 16) * 0x5bd1e995) & 0xffff) << 16));
+	  h ^= h >>> 15;
+
+	  return h >>> 0;
+	}
+
+	{
+	  module.exports = murmurhash2_32_gc;
+	} 
+} (murmurhash2_gc));
+
+var murmurhash2_gcExports = murmurhash2_gc.exports;
+
+var murmur3 = murmurhash3_gcExports;
+var murmur2 = murmurhash2_gcExports;
+
+murmurhashJs.exports = murmur3;
+var murmur3_1 = murmurhashJs.exports.murmur3 = murmur3;
+murmurhashJs.exports.murmur2 = murmur2;
+
 /*
  * A fast javascript implementation of simplex noise by Jonas Wagner
 
@@ -351,191 +496,13 @@ var Registries;
     Registries.blockModels = new IndexedRegistry();
 })(Registries || (Registries = {}));
 
-class Vector3D {
-    x;
-    y;
-    z;
-    constructor(x = 0, y = 0, z = 0) {
-        if (typeof x !== 'number')
-            throw new TypeError('x must be a number');
-        if (typeof y !== 'number')
-            throw new TypeError('y must be a number');
-        if (typeof z !== 'number')
-            throw new TypeError('z must be a number');
-        if (isNaN(x))
-            throw new TypeError('x must not be NaN');
-        if (isNaN(y))
-            throw new TypeError('y must not be NaN');
-        if (isNaN(z))
-            throw new TypeError('z must not be NaN');
-        this.x = x;
-        this.y = y;
-        this.z = z;
+var MathUtils;
+(function (MathUtils) {
+    function map(value, min, max, newMin, newMax) {
+        return (value - min) * (newMax - newMin) / (max - min) + newMin;
     }
-    set(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this._set(x, y, z);
-            }
-            else {
-                return this._set(x, x, x);
-            }
-        }
-        else {
-            return this._set(x.x, x.y, x.z);
-        }
-    }
-    add(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this._set(this.x + x, this.y + y, this.z + z);
-            }
-            else {
-                return this._set(this.x + x, this.y + x, this.z + x);
-            }
-        }
-        else {
-            return this._set(this.x + x.x, this.y + x.y, this.z + x.z);
-        }
-    }
-    subtract(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this._set(this.x - x, this.y - y, this.z - z);
-            }
-            else {
-                return this._set(this.x - x, this.y - x, this.z - x);
-            }
-        }
-        else {
-            return this._set(this.x - x.x, this.y - x.y, this.z - x.z);
-        }
-    }
-    reverseSubtract(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this._set(x - this.x, y - this.y, z - this.z);
-            }
-            else {
-                return this._set(x - this.x, x - this.y, x - this.z);
-            }
-        }
-        else {
-            return this._set(x.x - this.x, x.y - this.y, x.z - this.z);
-        }
-    }
-    scalarMultiply(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this._set(this.x * x, this.y * y, this.z * z);
-            }
-            else {
-                return this._set(this.x * x, this.y * x, this.z * x);
-            }
-        }
-        else {
-            return this._set(this.x * x.x, this.y * x.y, this.z * x.z);
-        }
-    }
-    scalarDivide(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this._set(this.x / x, this.y / y, this.z / z);
-            }
-            else {
-                return this._set(this.x / x, this.y / x, this.z / x);
-            }
-        }
-        else {
-            return this._set(this.x / x.x, this.y / x.y, this.z / x.z);
-        }
-    }
-    reverseScalarDivide(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this._set(x / this.x, y / this.y, this.z / z);
-            }
-            else if (typeof z == 'number') {
-                return this._set(x / this.x, x / this.y, this.z / z);
-            }
-            else {
-                throw new Error("Invalid syntax");
-            }
-        }
-        else if (typeof z == 'number') {
-            return this._set(x.x / this.x, x.y / this.y, x.z / this.z);
-        }
-    }
-    dot(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return this.x * x + this.y * y + this.z * z;
-            }
-            else {
-                return this.x * x + this.y * x + this.z * x;
-            }
-        }
-        else {
-            return this.x * x.x + this.y * x.y + this.z * x.z;
-        }
-    }
-    length() {
-        return Math.sqrt(this.lengthSquared());
-    }
-    lengthSquared() {
-        return this.x * this.x + this.y * this.y;
-    }
-    distanceTo(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return Math.sqrt(this.distanceSquaredTo(x, y, z));
-            }
-            else {
-                return Math.sqrt(this.distanceSquaredTo(x, x, x));
-            }
-        }
-        else {
-            return Math.sqrt(this.distanceSquaredTo(x.x, x.y, x.z));
-        }
-    }
-    distanceSquaredTo(x, y, z) {
-        if (typeof x === 'number') {
-            if (typeof y === 'number' && typeof z === 'number') {
-                return (this.x - x) ** 2 + (this.y - y) ** 2 + (this.z - z) ** 2;
-            }
-            else {
-                return (this.x - x) ** 2 + (this.y - x) ** 2 + (this.z - x) ** 2;
-            }
-        }
-        else {
-            return (this.x - x.x) ** 2 + (this.y - x.y) ** 2 + (this.z - x.z) ** 2;
-        }
-    }
-    normalize() {
-        return this.scalarDivide(this.length());
-    }
-    *[Symbol.iterator]() {
-        yield this.x;
-        yield this.y;
-    }
-    toString() {
-        return `${this.constructor.name} { ${this.x}, ${this.y} }`;
-    }
-    clone() {
-        return new this.constructor(this.x, this.y, this.z);
-    }
-    static *_from(vector, format) {
-        yield format[0] == 'x' ? vector.x : format[0] == 'y' ? vector.y : format[0] == '1' ? 1 : 0;
-        yield format[1] == 'x' ? vector.x : format[1] == 'y' ? vector.y : format[1] == '1' ? 1 : 0;
-        yield format[2] == 'x' ? vector.x : format[2] == 'y' ? vector.y : format[2] == '1' ? 1 : 0;
-    }
-    equals(other) {
-        return this.x == other.x && this.y == other.y && this.z == other.z;
-    }
-    aboutEquals(other, epsilon = 1e-8) {
-        return Math.abs(this.x - other.x) <= epsilon && Math.abs(this.y - other.y) <= epsilon && Math.abs(this.z - other.z) <= epsilon;
-    }
-}
+    MathUtils.map = map;
+})(MathUtils || (MathUtils = {}));
 
 class Vector2D {
     x;
@@ -701,10 +668,6 @@ class Vector2D {
     clone() {
         return new this.constructor(this.x, this.y);
     }
-    static *_from(vector, format) {
-        yield format[0] == 'x' ? vector.x : format[0] == 'y' ? vector.y : format[0] == 'z' ? vector.z : format[0] == '1' ? 1 : 0;
-        yield format[1] == 'x' ? vector.x : format[1] == 'y' ? vector.y : format[1] == 'z' ? vector.z : format[1] == '1' ? 1 : 0;
-    }
     equals(other) {
         return this.x === other.x && this.y === other.y;
     }
@@ -720,52 +683,299 @@ class ImmutableVector2D extends Vector2D {
     set(x, y) {
         throw new Error("Cannot set immutable vector");
     }
-    static from(vector, format) {
-        return new ImmutableVector2D(...Vector2D._from(vector, format));
-    }
 }
 
-class ImmutableVector3D extends Vector3D {
-    constructor(x, y, z) {
-        if (x instanceof Vector3D)
-            super(x.x, x.y, x.z);
-        else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number')
-            super(x, y, z);
-        else
-            super(0, 0, 0);
-    }
-    _set(x, y, z) {
-        return new ImmutableVector3D(x, y, z);
-    }
-    set(x, y, z) {
-        throw new Error("Cannot set immutable vector");
-    }
-    static from(vector, format) {
-        const values = [...Vector3D._from(vector, format)];
-        return new ImmutableVector3D(values[0], values[1], values[2]);
-    }
-}
-
-class MutableVector3D extends Vector3D {
-    constructor(x, y, z) {
-        if (x instanceof Vector3D)
-            super(x.x, x.y, x.z);
-        else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number')
-            super(x, y, z);
-        else
-            super(0, 0, 0);
-    }
-    _set(x, y, z) {
+class Vector3 {
+    x;
+    y;
+    z;
+    constructor(x = 0, y = 0, z = 0) {
         this.x = x;
         this.y = y;
         this.z = z;
+    }
+    set(x, y, z) {
+        if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+        else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
+            this.x = x.x;
+            this.y = x.y;
+            this.z = x.z;
+        }
+        else {
+            throw new TypeError("Invalid arguments");
+        }
         return this;
     }
-    static from(vector, format) {
-        const values = [...Vector3D._from(vector, format)];
-        return new MutableVector3D(values[0], values[1], values[2]);
+    add(x, y, z) {
+        if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
+            this.x += x;
+            this.y += y;
+            this.z += z;
+        }
+        else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
+            this.x += x.x;
+            this.y += x.y;
+            this.z += x.z;
+        }
+        else {
+            throw new TypeError("Invalid arguments");
+        }
+        return this;
+    }
+    plus(x, y, z) {
+        return this.clone().add(x, y, z);
+    }
+    subtract(x, y, z) {
+        if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
+            this.x -= x;
+            this.y -= y;
+            this.z -= z;
+        }
+        else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
+            this.x -= x.x;
+            this.y -= x.y;
+            this.z -= x.z;
+        }
+        else {
+            throw new TypeError("Invalid arguments");
+        }
+        return this;
+    }
+    minus(x, y, z) {
+        return this.clone().subtract(x, y, z);
+    }
+    multiply(x, y, z) {
+        if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
+            this.x *= x;
+            this.y *= y;
+            this.z *= z;
+        }
+        else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
+            this.x *= x.x;
+            this.y *= x.y;
+            this.z *= x.z;
+        }
+        else if (typeof x == "number" && typeof y == 'undefined' && typeof z == 'undefined') {
+            this.x *= x;
+            this.y *= x;
+            this.z *= x;
+        }
+        else {
+            throw new TypeError("Invalid arguments");
+        }
+        return this;
+    }
+    times(x, y, z) {
+        return this.clone().multiply(x, y, z);
+    }
+    divide(x, y, z) {
+        if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
+            this.x /= x;
+            this.y /= y;
+            this.z /= z;
+        }
+        else if (x instanceof Vector3 && typeof y == 'undefined' && typeof z == 'undefined') {
+            this.x /= x.x;
+            this.y /= x.y;
+            this.z /= x.z;
+        }
+        else if (typeof x == "number" && typeof y == 'undefined' && typeof z == 'undefined') {
+            this.x /= x;
+            this.y /= x;
+            this.z /= x;
+        }
+        else {
+            throw new TypeError("Invalid arguments");
+        }
+        return this;
+    }
+    over(x, y, z) {
+        return this.clone().divide(x, y, z);
+    }
+    dot(vector) {
+        return this.x * vector.x + this.y * vector.y + this.z * vector.z;
+    }
+    length() {
+        return Math.sqrt(this.lengthSquared());
+    }
+    lengthSquared() {
+        return this.x * this.x + this.y * this.y + this.z * this.z;
+    }
+    normalize() {
+        this.divide(this.length());
+        return this;
+    }
+    unit() {
+        return this.clone().normalize();
+    }
+    *[Symbol.iterator]() {
+        yield this.x;
+        yield this.y;
+        yield this.z;
+    }
+    clone() {
+        return new Vector3(this.x, this.y, this.z);
+    }
+    toString() {
+        return `(${this.x}, ${this.y}, ${this.z})`;
+    }
+    static from(vector2, format) {
+        return new Vector3(!isNaN(+format[0]) ? +format[0] : vector2[format[0]], !isNaN(+format[1]) ? +format[1] : vector2[format[1]], !isNaN(+format[2]) ? +format[2] : vector2[format[2]]);
+    }
+    equals(other, epsilon) {
+        if (typeof epsilon == 'number')
+            return Math.abs(this.x - other.x) <= epsilon && Math.abs(this.y - other.y) <= epsilon && Math.abs(this.z - other.z) <= epsilon;
+        else
+            return this.x == other.x && this.y == other.y && this.z == other.z;
     }
 }
+(function (Vector3) {
+    class Handled {
+        vector;
+        listeners;
+        constructor(vector, ...listeners) {
+            this.vector = vector;
+            this.listeners = listeners;
+        }
+        sendUpdate(original) {
+            for (const listener of this.listeners) {
+                listener(original, this);
+            }
+        }
+        on(event, listener) {
+            this.listeners.push(listener);
+            return this;
+        }
+        get x() {
+            return this.vector.x;
+        }
+        get y() {
+            return this.vector.y;
+        }
+        get z() {
+            return this.vector.z;
+        }
+        set x(value) {
+            this.vector.x = value;
+        }
+        set y(value) {
+            this.vector.y = value;
+        }
+        set z(value) {
+            this.vector.z = value;
+        }
+        set(x, y, z) {
+            const original = this.vector.clone();
+            this.vector.set(x, y, z);
+            this.sendUpdate(original);
+            return this;
+        }
+        add(x, y, z) {
+            const original = this.vector.clone();
+            this.vector.add(x, y, z);
+            this.sendUpdate(original);
+            return this;
+        }
+        plus(x, y, z) {
+            return this.vector.plus(x, y, z);
+        }
+        subtract(x, y, z) {
+            const original = this.vector.clone();
+            this.vector.subtract(x, y, z);
+            this.sendUpdate(original);
+            return this;
+        }
+        minus(x, y, z) {
+            return this.vector.minus(x, y, z);
+        }
+        multiply(x, y, z) {
+            const original = this.vector.clone();
+            this.vector.multiply(x, y, z);
+            this.sendUpdate(original);
+            return this;
+        }
+        times(x, y, z) {
+            return this.vector.times(x, y, z);
+        }
+        divide(x, y, z) {
+            const original = this.vector.clone();
+            this.vector.divide(x, y, z);
+            this.sendUpdate(original);
+            return this;
+        }
+        over(x, y, z) {
+            return this.vector.over(x, y, z);
+        }
+        dot(vector) {
+            return this.vector.dot(vector);
+        }
+        length() {
+            return this.vector.length();
+        }
+        lengthSquared() {
+            return this.vector.lengthSquared();
+        }
+        normalize() {
+            const original = this.vector.clone();
+            this.vector.normalize();
+            this.sendUpdate(original);
+            return this;
+        }
+        unit() {
+            return this.vector.unit();
+        }
+        *[Symbol.iterator]() {
+            yield this.vector.x;
+            yield this.vector.y;
+            yield this.vector.z;
+        }
+        clone() {
+            return this.vector.clone();
+        }
+        toString() {
+            return this.vector.toString();
+        }
+        equals(other, epsilon) {
+            return this.vector.equals(other, epsilon);
+        }
+    }
+    Vector3.Handled = Handled;
+    function handle(vector) {
+        return new Handled(vector);
+    }
+    Vector3.handle = handle;
+    function immutable(vector) {
+        return new Handled(vector, () => {
+            throw new Error("Cannot modify immutable vector");
+        });
+    }
+    Vector3.immutable = immutable;
+    function validated(vector) {
+        return new Handled(vector, (original, current) => {
+            if (typeof current.x !== 'number' || isNaN(current.x) || typeof current.y !== 'number' || isNaN(current.y) || typeof current.z !== 'number' || isNaN(current.z)) {
+                current.set(original);
+                console.warn("Invalid vector components " + current + ", reverting to " + original);
+            }
+        });
+    }
+    Vector3.validated = validated;
+    function floor(vector) {
+        return new Vector3(Math.floor(vector.x), Math.floor(vector.y), Math.floor(vector.z));
+    }
+    Vector3.floor = floor;
+    function ceil(vector) {
+        return new Vector3(Math.ceil(vector.x), Math.ceil(vector.y), Math.ceil(vector.z));
+    }
+    Vector3.ceil = ceil;
+    function round(vector) {
+        return new Vector3(Math.round(vector.x), Math.round(vector.y), Math.round(vector.z));
+    }
+    Vector3.round = round;
+})(Vector3 || (Vector3 = {}));
 
 /**
  * A `ChunkDataReferencer` converts between indexes and
@@ -787,13 +997,13 @@ var ChunkDataReferencer;
     /**
      * The dimensions of the chunk as a 3D vector.
      */
-    ChunkDataReferencer.dimensions = new ImmutableVector3D(16, 64, 16);
+    ChunkDataReferencer.dimensions = Vector3.immutable(new Vector3(16, 64, 16));
     /**
      * Returns the total number of cells in a chunk.
      */
     ChunkDataReferencer.cells = ChunkDataReferencer.dimensions.x * ChunkDataReferencer.dimensions.y * ChunkDataReferencer.dimensions.z;
     function index(x, y, z) {
-        if (x instanceof Vector3D) {
+        if (x instanceof Vector3) {
             y = x.y;
             z = x.z;
             x = x.x;
@@ -846,7 +1056,7 @@ var ChunkDataReferencer;
      * The method is the opposite of `index()`.
      */
     function position(index) {
-        return new MutableVector3D(this.x(index), this.y(index), this.z(index));
+        return new Vector3(this.x(index), this.y(index), this.z(index));
     }
     ChunkDataReferencer.position = position;
     function isOutOfBounds(position) {
@@ -927,7 +1137,7 @@ class ChunkData {
         if (x instanceof BlockPosition) {
             return this.getField('blockId').get(x.getLocalPosition());
         }
-        else if (x instanceof Vector3D) {
+        else if (x instanceof Vector3) {
             return this.getField('blockId').get(x);
         }
         else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
@@ -944,7 +1154,7 @@ class ChunkData {
         if (x instanceof BlockPosition) {
             return Registries.blocks.get(this.getBlockId(x));
         }
-        else if (x instanceof Vector3D) {
+        else if (x instanceof Vector3) {
             return Registries.blocks.get(this.getBlockId(x));
         }
         else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') {
@@ -962,7 +1172,7 @@ class ChunkData {
             const localPostion = x.getLocalPosition();
             this.setBlockId(localPostion, y);
         }
-        else if (x instanceof Vector3D && typeof y === 'number') {
+        else if (x instanceof Vector3 && typeof y === 'number') {
             this.getField('blockId').set(x, y);
             this.updates.add(ChunkDataReferencer.index(x));
         }
@@ -982,7 +1192,7 @@ class ChunkData {
         if (x instanceof BlockPosition && y instanceof BlockPrototype) {
             this.setBlockId(x, y.getRegisteredId());
         }
-        else if (x instanceof Vector3D && y instanceof BlockPrototype) {
+        else if (x instanceof Vector3 && y instanceof BlockPrototype) {
             this.setBlockId(x, y.getRegisteredId());
         }
         else if (typeof x === 'number' && typeof y == 'number' && typeof z == 'number' && block instanceof BlockPrototype) {
@@ -1024,24 +1234,18 @@ class ChunkInterface {
     ChunkInterface.Placeholder = Placeholder;
 })(ChunkInterface || (ChunkInterface = {}));
 
-class Chunk extends ChunkInterface.NonPlaceholder {
+class BaseChunk extends ChunkInterface.NonPlaceholder {
     position;
     world = null;
     chunkData;
     constructor() {
         super();
     }
-    setChunkData(chunkData) {
-        this.chunkData = chunkData;
-        this.chunkData.setParentChunk(this);
-    }
     getPosition() {
         return this.position;
     }
     getWorld() {
-        if (!this.world)
-            throw new Error("Cannot get world of unbound chunk");
-        return this.world;
+        return this.world ?? null;
     }
     getChunkData() {
         return this.chunkData;
@@ -1065,6 +1269,10 @@ class Chunk extends ChunkInterface.NonPlaceholder {
     async tickChunk() {
         await this.chunkData.tickChunkData();
     }
+    loadState = {
+        current: Infinity,
+        target: Infinity
+    };
 }
 
 class PlaceholderChunk extends ChunkInterface.Placeholder {
@@ -1077,9 +1285,7 @@ class PlaceholderChunk extends ChunkInterface.Placeholder {
         return this.position;
     }
     getWorld() {
-        if (!this.world)
-            throw new Error("Cannot get world of unbound chunk");
-        return this.world;
+        return this.world ?? null;
     }
     getChunkData() {
         throw new Error("Chunk data does not exist on placeholder");
@@ -1091,25 +1297,70 @@ class PlaceholderChunk extends ChunkInterface.Placeholder {
     unloadChunk() { }
     setupChunk() { }
     async tickChunk() { }
+    loadState = {
+        current: 0,
+        target: 0
+    };
+}
+
+class ChunkLoadQueue {
+    world;
+    chunks = [];
+    constructor(world) {
+        this.world = world;
+        // TODO: Only for development
+        (window.__dev__ ??= {}).clq = this;
+    }
+    has(state) {
+        return this.chunks[state] && this.chunks[state].length > 0;
+    }
+    add(chunk) {
+        const loadState = chunk.loadState;
+        if (!this.chunks[loadState.current]) {
+            this.chunks[loadState.current] = [];
+        }
+        if (!this.chunks[loadState.current].includes(chunk)) {
+            this.chunks[loadState.current].push(chunk);
+        }
+    }
+    remove(chunk) {
+        const loadState = chunk.loadState;
+        let array = this.chunks[loadState.current];
+        array.splice(array.indexOf(chunk), 1);
+    }
+    entries() {
+        return this.chunks;
+    }
 }
 
 class World {
     entityIdMapping;
     chunks;
     loader;
+    queue;
     constructor() {
         this.entityIdMapping = new Map();
         this.chunks = new Map();
+        this.queue = new ChunkLoadQueue(this);
+        // TODO: Only for development
+        (window.__dev__ ??= {}).world = this;
     }
-    bindWorldLoader(loader) {
+    getWorldLoader() {
+        return this.loader;
+    }
+    setWorldLoader(loader) {
         this.loader = loader;
+        loader.bindWorld(this);
+    }
+    getChunkLoadQueue() {
+        return this.queue;
     }
     createChunk(x, z) {
         if (x instanceof Vector2D) {
             z = x.y;
             x = x.x;
         }
-        const chunk = new Chunk();
+        const chunk = new BaseChunk();
         chunk.bindWorld(this, new ImmutableVector2D(x, z));
         chunk.setupChunk();
         return chunk;
@@ -1157,44 +1408,45 @@ class World {
         }
         this._validateDisconnectedEntities();
     }
-    loadChunk(x, z) {
-        let position;
-        if (typeof x === 'number') {
-            if (typeof z !== 'number') {
-                throw new Error("Invalid arguments");
-            }
-            else {
-                position = new ImmutableVector2D(x, z);
-            }
+    setChunk(x, z, chunk) {
+        if (x instanceof Vector2D) {
+            chunk = z;
+            z = x.y;
+            x = x.x;
         }
-        else {
-            position = new ImmutableVector2D(x.x, x.y);
+        else if (typeof z !== 'number') {
+            throw new Error("Invalid arguments");
         }
-        let presentChunk = this.getChunk(position);
-        if (presentChunk) {
-            return presentChunk;
+        if (chunk === undefined) {
+            throw new Error("Invalid arguments");
+        }
+        const old = this.getChunk(x, z);
+        if (old) {
+            old.unloadChunk();
+        }
+        this.chunks.set(x + '.' + z, chunk);
+        chunk.bindWorld(this, new ImmutableVector2D(x, z));
+    }
+    loadChunk(x, z, target) {
+        if (x instanceof Vector2D) {
+            target = z;
+            z = x.y;
+            x = x.x;
+        }
+        else if (typeof z !== 'number') {
+            throw new Error("Invalid arguments");
+        }
+        const chunk = this.getChunk(x, z);
+        if (chunk) {
+            return chunk;
         }
         if (!this.loader) {
             throw new Error("Cannot load chunk: World has no loader");
         }
         const placeholder = new PlaceholderChunk();
-        this.chunks.set(position.x + '.' + position.y, placeholder);
-        placeholder.bindWorld(this, position);
-        this.loader.loadChunk(position).then(chunkData => {
-            const chunk = new Chunk();
-            chunk.bindWorld(this, position);
-            chunk.setChunkData(chunkData);
-            this.chunks.set(position.x + '.' + position.y, chunk);
-            for (const entity of this.entityIdMapping.values()) {
-                const parentChunk = entity.getParentChunk();
-                if (!parentChunk)
-                    continue;
-                if (parentChunk.getPosition().equals(position)) {
-                    entity.setParentChunk(chunk);
-                    chunk.getChunkData().addEntity(entity);
-                }
-            }
-        });
+        this.setChunk(new ImmutableVector2D(x, z), placeholder);
+        placeholder.loadState.target = target ?? Infinity;
+        this.queue.add(placeholder);
         return placeholder;
     }
 }
@@ -1203,7 +1455,7 @@ class BlockPosition {
     position;
     reference;
     constructor(x, y, z, reference) {
-        if (x instanceof Vector3D) {
+        if (x instanceof Vector3) {
             if (y instanceof World || y instanceof ChunkData) {
                 this.position = x;
                 this.reference = y;
@@ -1213,11 +1465,11 @@ class BlockPosition {
             }
         }
         else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number' && reference instanceof World) {
-            this.position = new ImmutableVector3D(x, y, z);
+            this.position = new Vector3(x, y, z);
             this.reference = reference;
         }
         else if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number' && reference instanceof ChunkData) {
-            this.position = new ImmutableVector3D(x, y, z);
+            this.position = new Vector3(x, y, z);
             this.reference = reference;
         }
         else {
@@ -1234,7 +1486,7 @@ class BlockPosition {
                 throw new Error("Cannot get global position of disconnected ChunkData");
             }
             const position = chunk.getPosition();
-            return this.position.clone().add(ImmutableVector3D.from(position, "x0y"));
+            return this.position.clone().add(Vector3.from(position, "x0y"));
         }
     }
     getLocalPosition() {
@@ -1242,7 +1494,7 @@ class BlockPosition {
             return this.position.clone();
         }
         else {
-            return this.position.clone().subtract(ImmutableVector3D.from(this.getChunkPosition(), 'x0y'));
+            return this.position.clone().subtract(Vector3.from(this.getChunkPosition(), 'x0y'));
         }
     }
     getChunkPosition() {
@@ -1265,7 +1517,7 @@ class BlockPosition {
         }
         else {
             const chunk = this.reference.getChunk();
-            if (!chunk) {
+            if (!chunk || !chunk.getWorld()) {
                 throw new Error("Cannot get world of disconnected ChunkData");
             }
             return chunk.getWorld();
@@ -1315,7 +1567,7 @@ class ChunkDataField {
         else if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number') {
             return this._get(ChunkDataReferencer.index(x, y, z));
         }
-        else if (x instanceof Vector3D) {
+        else if (x instanceof Vector3) {
             return this._get(ChunkDataReferencer.index(x));
         }
         else if (x instanceof BlockPosition) {
@@ -1329,10 +1581,10 @@ class ChunkDataField {
         if (typeof x == 'number' && typeof y == 'number' && typeof z == 'number' && typeof value != 'undefined') {
             return this._set(ChunkDataReferencer.index(x, y, z), value);
         }
-        else if (x instanceof Vector3D && typeof y != 'number') {
+        else if (x instanceof Vector3) {
             return this._set(ChunkDataReferencer.index(x), y);
         }
-        else if (x instanceof BlockPosition && typeof y != 'number') {
+        else if (x instanceof BlockPosition) {
             return this._set(ChunkDataReferencer.index(x.getLocalPosition()), y);
         }
         else if (typeof x == 'number') {
@@ -1486,22 +1738,346 @@ var NoiseUtils;
     NoiseUtils.octavedNoise3D = octavedNoise3D;
 })(NoiseUtils || (NoiseUtils = {}));
 
-var MathUtils;
-(function (MathUtils) {
-    function map(value, min, max, newMin, newMax) {
-        return (value - min) * (newMax - newMin) / (max - min) + newMin;
+var Feature;
+(function (Feature) {
+    function* resolveCollisions(checkedFeatures, otherFeatures) {
+        checkedFeatures = [...checkedFeatures];
+        otherFeatures = [...otherFeatures];
+        const allFeatures = [...otherFeatures, ...checkedFeatures];
+        for (const feature of checkedFeatures) {
+            let destroy = false;
+            for (const other of allFeatures) {
+                if (feature === other) {
+                    continue;
+                }
+                if (feature.getBoundingBox()[0].x <= other.getBoundingBox()[1].x &&
+                    feature.getBoundingBox()[1].x >= other.getBoundingBox()[0].x &&
+                    feature.getBoundingBox()[0].y <= other.getBoundingBox()[1].y &&
+                    feature.getBoundingBox()[1].y >= other.getBoundingBox()[0].y &&
+                    feature.getBoundingBox()[0].z <= other.getBoundingBox()[1].z &&
+                    feature.getBoundingBox()[1].z >= other.getBoundingBox()[0].z) {
+                    if (feature.doesReplace(other))
+                        continue;
+                    if (other.doesReplace(feature)) {
+                        destroy = true;
+                    }
+                    else {
+                        let hash = feature.getFeatureHash();
+                        let otherHash = other.getFeatureHash();
+                        if (otherHash < hash) {
+                            destroy = true;
+                        }
+                        else if (otherHash == hash) {
+                            destroy = true;
+                        }
+                    }
+                }
+            }
+            if (!destroy) {
+                yield feature;
+            }
+        }
     }
-    MathUtils.map = map;
-})(MathUtils || (MathUtils = {}));
+    Feature.resolveCollisions = resolveCollisions;
+})(Feature || (Feature = {}));
+
+class SemiloadedChunk extends PlaceholderChunk {
+    data;
+    static State = Symbol("semiloaded");
+    features = new Set();
+    constructor(data) {
+        super();
+        this.data = data;
+    }
+    getChunkData() {
+        return this.data;
+    }
+    *getFeatures() {
+        yield* this.features;
+    }
+    storeFeatures(features) {
+        this.features.clear();
+        for (const feature of features) {
+            this.features.add(feature);
+        }
+    }
+    loadState = { current: 1, target: 0 };
+}
+
+class TreeFeature {
+    position;
+    chunkPosition;
+    seed;
+    absolute;
+    height;
+    constructor(position, chunkPosition, seed) {
+        this.position = position;
+        this.chunkPosition = chunkPosition;
+        this.seed = seed;
+        const x = this.position.x + this.chunkPosition.x * ChunkDataReferencer.dimensions.x;
+        const y = this.position.y;
+        const z = this.position.z + this.chunkPosition.y * ChunkDataReferencer.dimensions.z;
+        this.absolute = new Vector3(x, y, z);
+        const root = x + '.' + y + '.' + z;
+        this.height = murmur3_1(root + ':treeHeight', this.seed) % 5 + 7;
+    }
+    getBoundingBox() {
+        return [this.absolute.plus(-1, 0, -1), this.absolute.plus(1, this.height, 1)];
+    }
+    placeFeature(chunk) {
+        const log = Registries.blocks.get('log.along_y');
+        if (!log)
+            throw new Error("Log block not found");
+        const leaves = Registries.blocks.get('leaves');
+        if (!leaves)
+            throw new Error("Leaves block not found");
+        const chunkData = chunk.getChunkData();
+        const chunkPosition = chunk.getPosition();
+        const localPosition = this.absolute.minus(chunkPosition.x * ChunkDataReferencer.dimensions.x, 0, chunkPosition.y * ChunkDataReferencer.dimensions.z);
+        for (let i = 0; i < this.height; i++) {
+            const logPosition = localPosition.plus(0, i, 0);
+            if (!ChunkDataReferencer.isOutOfBounds(logPosition)) {
+                chunkData.setBlock(logPosition, log);
+            }
+            if (i == 0)
+                continue;
+            const position = localPosition.plus(0, i, 0);
+            let radius = (this.height - i) / 2 / 2 + 1;
+            if (i % 2 == 0 && i < this.height - 1) {
+                radius = (radius + 0.5) / 2;
+            }
+            const radiusSquared = radius * radius;
+            for (let x = -Math.floor(radius); x <= Math.ceil(radius); x++) {
+                for (let z = -Math.floor(radius); z <= Math.ceil(radius); z++) {
+                    if (x * x + z * z > radiusSquared)
+                        continue;
+                    if (ChunkDataReferencer.isOutOfBounds(position.plus(x, 0, z)))
+                        continue;
+                    const current = chunkData.getBlock(position.x + x, position.y, position.z + z);
+                    if (current && current.getRegisteredName() != 'air')
+                        continue;
+                    chunkData.setBlock(position.x + x, position.y, position.z + z, leaves);
+                }
+            }
+        }
+        const topPosition = localPosition.plus(0, this.height, 0);
+        if (!ChunkDataReferencer.isOutOfBounds(topPosition)) {
+            const current = chunkData.getBlock(topPosition);
+            if (!current || current.getRegisteredName() == 'air') {
+                chunkData.setBlock(topPosition, leaves);
+            }
+        }
+    }
+    getFeatureHash() {
+        return murmur3_1(this.absolute.x + '.' + this.absolute.y + '.' + this.absolute.z + ':treeHash', this.seed);
+    }
+    doesReplace(feature) {
+        return false;
+    }
+}
+
+class LoadedChunk extends BaseChunk {
+    features = new Set();
+    constructor(data) {
+        super();
+        this.chunkData = data;
+    }
+    *getFeatures() {
+        yield* this.features;
+    }
+    storeFeatures(features) {
+        this.features.clear();
+        for (const feature of features) {
+            this.features.add(feature);
+        }
+    }
+    placeFeatures(neighboringFeatures) {
+        for (const feature of this.features) {
+            feature.placeFeature(this);
+        }
+        for (const feature of neighboringFeatures) {
+            feature.placeFeature(this);
+        }
+    }
+}
+
+class RockFeature {
+    position;
+    chunkPosition;
+    seed;
+    absolute;
+    size;
+    box;
+    constructor(position, chunkPosition, seed) {
+        this.position = position;
+        this.chunkPosition = chunkPosition;
+        this.seed = seed;
+        const x = this.position.x + this.chunkPosition.x * ChunkDataReferencer.dimensions.x;
+        const y = this.position.y;
+        const z = this.position.z + this.chunkPosition.y * ChunkDataReferencer.dimensions.z;
+        this.absolute = new Vector3(x, y, z);
+        const root = x + '.' + y + '.' + z;
+        this.size = new Vector3(murmur3_1(root + ':rock.size.x', this.seed) % 1 + 5, murmur3_1(root + ':rock.size.y', this.seed) % 1 + 5, murmur3_1(root + ':rock.size.z', this.seed) % 1 + 5);
+        this.box = [
+            Vector3.floor(this.absolute.plus(-this.size.x / 2, 0, -this.size.z / 2)),
+            Vector3.ceil(this.absolute.plus(this.size.x / 2, this.size.y, this.size.z / 2))
+        ];
+    }
+    getBoundingBox() {
+        return this.box;
+    }
+    placeFeature(chunk) {
+        const cobblestone = Registries.blocks.get('cobblestone');
+        if (!cobblestone)
+            throw new Error("Cobblestone block not found");
+        const chunkData = chunk.getChunkData();
+        const chunkPosition = chunk.getPosition();
+        const localPosition = this.absolute.minus(chunkPosition.x * ChunkDataReferencer.dimensions.x, 0, chunkPosition.y * ChunkDataReferencer.dimensions.z);
+        for (let x = Math.floor(-this.size.x / 2 + localPosition.x); x < this.size.x / 2 + localPosition.x; x++) {
+            for (let y = Math.floor(-this.size.y / 2 + localPosition.y); y < this.size.y / 2 + localPosition.y; y++) {
+                for (let z = Math.floor(-this.size.z / 2 + localPosition.z); z < this.size.z / 2 + localPosition.z; z++) {
+                    if (ChunkDataReferencer.isOutOfBounds(new Vector3(x, y, z)))
+                        continue;
+                    const distance = (x - this.absolute.x) ** 2 / (this.size.x / 2) ** 2 + (y - this.absolute.y) ** 2 / (this.size.y / 2) ** 2 + (z - this.absolute.z) ** 2 / (this.size.z / 2) ** 2;
+                    if (distance > 1)
+                        continue;
+                    const current = chunkData.getBlock(x, y, z);
+                    if (current && current.getRegisteredName() != "air")
+                        continue;
+                    chunkData.setBlock(x, y, z, cobblestone);
+                }
+            }
+        }
+    }
+    getFeatureHash() {
+        return murmur3_1(this.absolute.x + '.' + this.absolute.y + '.' + this.absolute.z + ':rockHash', this.seed);
+    }
+    doesReplace(feature) {
+        return feature instanceof TreeFeature;
+    }
+}
 
 class SimpleWorldGenerator {
     surface2DNoise;
     surface3DNoise;
+    world;
     caveNoises;
-    constructor() {
+    bindWorld(world) {
+        this.world = world;
         this.surface2DNoise = NoiseUtils.scaledNoise2D(NoiseUtils.octavedNoise2D(4), 64);
         this.surface3DNoise = NoiseUtils.scaledNoise3D(createNoise3D(), 32);
         this.caveNoises = [createNoise3D(), createNoise3D(), createNoise3D()];
+    }
+    phase = 0;
+    phases = 2;
+    async generateChunks(maxSteps = 1) {
+        if (maxSteps == 0)
+            return;
+        const loadQueue = this.world.getChunkLoadQueue();
+        let chunks = [...loadQueue.entries()];
+        let steps = 0;
+        let failed = 0;
+        while (steps < maxSteps) {
+            const queue = chunks[this.phase];
+            if (!queue || queue.length == 0) {
+                if (failed >= maxSteps)
+                    break;
+                failed++;
+            }
+            else {
+                if (this.phase == 0) {
+                    await this.generateInitialChunk(queue[0], loadQueue);
+                    steps++;
+                    failed = 0;
+                }
+                else if (this.phase == 1) {
+                    if (await this.tryGenerateSemiloaded(queue, loadQueue)) {
+                        steps++;
+                        failed = 0;
+                    }
+                    else {
+                        failed++;
+                    }
+                }
+            }
+            this.phase = (this.phase + 1) % this.phases;
+        }
+    }
+    async generateInitialChunk(chunk, queue) {
+        queue.remove(chunk);
+        const newChunk = await this.generateTerrain(chunk.getPosition());
+        newChunk.loadState.target = chunk.loadState.target;
+        this.world.setChunk(chunk.getPosition(), newChunk);
+        queue.add(newChunk);
+    }
+    static NEIGHBORS = [
+        new ImmutableVector2D(-1, -1),
+        new ImmutableVector2D(0, -1),
+        new ImmutableVector2D(1, -1),
+        new ImmutableVector2D(-1, 0),
+        new ImmutableVector2D(1, 0),
+        new ImmutableVector2D(-1, 1),
+        new ImmutableVector2D(0, 1),
+        new ImmutableVector2D(1, 1)
+    ];
+    async tryGenerateSemiloaded(entries, queue) {
+        let chunk = entries.find(chunk => chunk.loadState.current != chunk.loadState.target);
+        if (!chunk)
+            return false;
+        queue.remove(chunk);
+        let features = [];
+        let thisPosition = chunk.getPosition();
+        for (let neighbor of SimpleWorldGenerator.NEIGHBORS) {
+            let neighborPosition = thisPosition.clone().add(neighbor);
+            let neighborChunk = this.world.getChunk(neighborPosition);
+            if (neighborChunk && (neighborChunk instanceof SemiloadedChunk || neighborChunk instanceof LoadedChunk)) {
+                features.push(...neighborChunk.getFeatures());
+            }
+            else {
+                chunk.getWorld()?.loadChunk(neighborPosition, 1);
+                queue.add(chunk);
+                return false;
+            }
+        }
+        if (!(chunk instanceof SemiloadedChunk)) {
+            throw new Error("Chunk is not semiloaded when it should be");
+        }
+        const newChunk = new LoadedChunk(chunk.getChunkData());
+        newChunk.storeFeatures(Feature.resolveCollisions(chunk.getFeatures(), features));
+        newChunk.loadState.target = chunk.loadState.target;
+        this.world.setChunk(chunk.getPosition(), newChunk);
+        queue.add(newChunk);
+        newChunk.placeFeatures(Feature.resolveCollisions(features, features));
+        return true;
+    }
+    async generateTerrain(location) {
+        const semiloaded = new SemiloadedChunk(await this.generateChunk(location));
+        await this.addFeatures(location, semiloaded);
+        return semiloaded;
+    }
+    async addFeatures(location, chunk) {
+        let features = [];
+        for (let i = 0; i < murmur3_1(location.x + '.' + location.y + ':treeCount') % 5 + 5; i++) {
+            let x = murmur3_1(location.x + '.' + location.y + '.' + i + ':treeX') % ChunkDataReferencer.dimensions.x;
+            let z = murmur3_1(location.x + '.' + location.y + '.' + i + ':treeZ') % ChunkDataReferencer.dimensions.z;
+            for (let y = ChunkDataReferencer.dimensions.y - 1; y >= 0; y--) {
+                if (chunk.getChunkData().getBlock(x, y, z) != Registries.blocks.get('air')) {
+                    features.push(new TreeFeature(new Vector3(x, y + 1, z), location, 0));
+                    break;
+                }
+            }
+        }
+        for (let i = 0; i < murmur3_1(location.x + '.' + location.y + ':rockCount') % 4; i++) {
+            let x = murmur3_1(location.x + '.' + location.y + '.' + i + ':rockX') % ChunkDataReferencer.dimensions.x;
+            let z = murmur3_1(location.x + '.' + location.y + '.' + i + ':rockZ') % ChunkDataReferencer.dimensions.z;
+            for (let y = ChunkDataReferencer.dimensions.y - 1; y >= 0; y--) {
+                if (chunk.getChunkData().getBlock(x, y, z) != Registries.blocks.get('air')) {
+                    features.push(new RockFeature(new Vector3(x, y + 1, z), location, 0));
+                    break;
+                }
+            }
+        }
+        chunk.storeFeatures(features);
     }
     async createDensities(location, data) {
         for (let x = 0; x < ChunkDataReferencer.dimensions.x; x++) {
@@ -1564,7 +2140,7 @@ class SimpleWorldGenerator {
         const dirt = Registries.blocks.get('dirt');
         const grass = Registries.blocks.get('grass');
         if (!(stone && air && dirt && grass)) {
-            throw new Error("Failed to blocks for simple world generator");
+            throw new Error("Blocks to not exist for simple world generator");
         }
         for (let x = 0; x < ChunkDataReferencer.dimensions.x; x++) {
             for (let z = 0; z < ChunkDataReferencer.dimensions.z; z++) {
@@ -1923,6 +2499,22 @@ class BoxModelComponent {
     static textureMappings = [this.textureNorth, this.textureSouth, this.textureEast, this.textureWest, this.textureTop, this.textureBottom];
 }
 
+class CobblestonePrototype extends BaseBlockPrototype {
+    getBlockModel(position) {
+        return CobblestonePrototype.model;
+    }
+    static model;
+    static texture;
+    static async setup() {
+        this.texture = await Texture.load("blocks.cobblestone");
+        this.model = new BlockModel({ transparent: true });
+        const box = new BoxModelComponent(new Vector3(1, 1, 1), new Array(6).fill(this.texture));
+        this.model.add(box);
+        Registries.blocks.register('cobblestone', new CobblestonePrototype());
+        Registries.blockModels.register('cobblestone', CobblestonePrototype.model);
+    }
+}
+
 class DirtPrototype extends BaseBlockPrototype {
     whenPlaced(position) {
         console.log("Dirt placed at " + position.toString());
@@ -1935,11 +2527,51 @@ class DirtPrototype extends BaseBlockPrototype {
     static async setup() {
         this.texture = await Texture.load("blocks.dirt");
         this.model = new BlockModel();
-        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), new Array(6).fill(this.texture));
+        const box = new BoxModelComponent(new Vector3(1, 1, 1), new Array(6).fill(this.texture));
         this.model.add(box);
     }
     static getBlockModel() {
         return DirtPrototype.model;
+    }
+}
+
+class GrassPrototype extends BaseBlockPrototype {
+    whenPlaced(position) {
+        console.log("Grass placed at " + position.toString());
+    }
+    getBlockModel(position) {
+        return GrassPrototype.model;
+    }
+    static model;
+    static top;
+    static side;
+    static bottom;
+    static async setup() {
+        this.top = await Texture.load("blocks.grass.top");
+        this.side = await Texture.load("blocks.grass.side");
+        this.bottom = await Texture.load("blocks.dirt");
+        this.model = new BlockModel();
+        const box = new BoxModelComponent(new Vector3(1, 1, 1), [this.side, this.side, this.side, this.side, this.top, this.bottom]);
+        this.model.add(box);
+    }
+    static getBlockModel() {
+        return GrassPrototype.model;
+    }
+}
+
+class LeavesPrototype extends BaseBlockPrototype {
+    getBlockModel(position) {
+        return LeavesPrototype.model;
+    }
+    static model;
+    static texture;
+    static async setup() {
+        this.texture = await Texture.load("blocks.leaves");
+        this.model = new BlockModel({ transparent: true });
+        const box = new BoxModelComponent(new Vector3(1, 1, 1), new Array(6).fill(this.texture));
+        this.model.add(box);
+        Registries.blocks.register('leaves', new LeavesPrototype());
+        Registries.blockModels.register('leaves', LeavesPrototype.model);
     }
 }
 
@@ -1980,16 +2612,16 @@ class Quaternion {
         return new Quaternion(x, y, z, w);
     }
     rotate(vector) {
-        let quaternion = new Quaternion(0, vector.x, vector.y, vector.z);
+        let quaternion = new Quaternion(vector.x, vector.y, vector.z, 0);
         let inverse = this.clone().inverse();
-        let result = this.clone().multiply(quaternion).multiply(inverse);
-        return new MutableVector3D(result.x, result.y, result.z);
+        let result = this.times(quaternion).multiply(inverse);
+        return new Vector3(result.x, result.y, result.z);
     }
     inverseRotate(vector) {
-        let quaternion = new Quaternion(0, vector.x, vector.y, vector.z);
+        let quaternion = new Quaternion(vector.x, vector.y, vector.z, 0);
         let inverse = this.clone().inverse();
         let result = inverse.multiply(quaternion).multiply(this);
-        return new MutableVector3D(result.x, result.y, result.z);
+        return new Vector3(result.x, result.y, result.z);
     }
     clone() {
         return new Quaternion(this.x, this.y, this.z, this.w);
@@ -2003,7 +2635,7 @@ class Quaternion {
     static fromAxisAngle(axis, angle) {
         let cos = Math.cos(angle / 2);
         let sin = Math.sin(angle / 2);
-        return new Quaternion(cos, axis.x * sin, axis.y * sin, axis.z * sin);
+        return new Quaternion(axis.x * sin, axis.y * sin, axis.z * sin, cos);
     }
     static fromRotation(rotation) {
         let quaternion = null;
@@ -2060,9 +2692,9 @@ class Rotation {
         return new Rotation(this.yaw, this.pitch, this.roll);
     }
     *toAxisRotations() {
-        yield [new MutableVector3D(0, 1, 0), this.yaw];
-        yield [new MutableVector3D(1, 0, 0), this.pitch];
-        yield [new MutableVector3D(0, 0, 1), this.roll];
+        yield [new Vector3(0, 1, 0), this.yaw];
+        yield [new Vector3(1, 0, 0), this.pitch];
+        yield [new Vector3(0, 0, 1), this.roll];
     }
     static fromDegrees(yaw, pitch, roll) {
         return new Rotation(Math.PI / 180 * yaw, Math.PI / 180 * pitch, Math.PI / 180 * roll);
@@ -2085,16 +2717,10 @@ class RotatedModelComponent {
     origin;
     child;
     quaternion;
-    constructor(rotation = new Rotation(), origin = new ImmutableVector3D(0.5, 0.5, 0.5), child = new EmptyModelComponent()) {
+    constructor(rotation = new Rotation(), origin = new Vector3(0.5, 0.5, 0.5), child = new EmptyModelComponent()) {
         this.origin = origin;
         this.child = child;
         this.quaternion = rotation instanceof Rotation ? Quaternion.fromRotation(rotation) : rotation;
-    }
-    getQuaternion() {
-        return this.quaternion.clone();
-    }
-    setQuaternion(quaternion) {
-        this.quaternion = quaternion;
     }
     add(child) {
         this.child = child;
@@ -2105,7 +2731,7 @@ class RotatedModelComponent {
             const x = childVertices[i * 3];
             const y = childVertices[i * 3 + 1];
             const z = childVertices[i * 3 + 2];
-            const position = this.quaternion.rotate(new MutableVector3D(x, y, z).subtract(this.origin)).add(this.origin);
+            const position = this.quaternion.rotate(new Vector3(x, y, z).subtract(this.origin)).add(this.origin);
             childVertices[i * 3] = position.x;
             childVertices[i * 3 + 1] = position.y;
             childVertices[i * 3 + 2] = position.z;
@@ -2120,28 +2746,194 @@ class RotatedModelComponent {
     }
 }
 
-class GrassPrototype extends BaseBlockPrototype {
+class Matrix3 {
+    data;
+    constructor(data = [1, 0, 0, 0, 1, 0, 0, 0, 1]) {
+        this.data = data;
+    }
+    multiply(value) {
+        if (value instanceof Vector3) {
+            return Matrix3.multiplyVector(this, value);
+        }
+        else if (value instanceof Matrix3) {
+            return Matrix3.multiply(this, value, this);
+        }
+        else {
+            throw new Error("Invalid arguments");
+        }
+    }
+    static multiply(matrix1, matrix2, target = new Matrix3()) {
+        const a = matrix1.data;
+        const b = matrix2.data;
+        const c = target.data;
+        const a00 = a[0], a01 = a[1], a02 = a[2];
+        const a10 = a[3], a11 = a[4], a12 = a[5];
+        const a20 = a[6], a21 = a[7], a22 = a[8];
+        const b00 = b[0], b01 = b[1], b02 = b[2];
+        const b10 = b[3], b11 = b[4], b12 = b[5];
+        const b20 = b[6], b21 = b[7], b22 = b[8];
+        c[0] = b00 * a00 + b01 * a10 + b02 * a20;
+        c[1] = b00 * a01 + b01 * a11 + b02 * a21;
+        c[2] = b00 * a02 + b01 * a12 + b02 * a22;
+        c[3] = b10 * a00 + b11 * a10 + b12 * a20;
+        c[4] = b10 * a01 + b11 * a11 + b12 * a21;
+        c[5] = b10 * a02 + b11 * a12 + b12 * a22;
+        c[6] = b20 * a00 + b21 * a10 + b22 * a20;
+        c[7] = b20 * a01 + b21 * a11 + b22 * a21;
+        c[8] = b20 * a02 + b21 * a12 + b22 * a22;
+        return target;
+    }
+    static multiplyVector(matrix, vector, target = new Vector3()) {
+        const a = matrix.data;
+        const b = vector;
+        const c = target;
+        const x = b.x, y = b.y, z = b.z;
+        c.x = a[0] * x + a[3] * y + a[6] * z;
+        c.y = a[1] * x + a[4] * y + a[7] * z;
+        c.z = a[2] * x + a[5] * y + a[8] * z;
+        return target;
+    }
+    static createRotation(rotation, target = new Matrix3()) {
+        let matrix = target || new Matrix3();
+        matrix.multiply(Matrix3.createRotationY(rotation.yaw));
+        matrix.multiply(Matrix3.createRotationX(rotation.pitch));
+        matrix.multiply(Matrix3.createRotationZ(rotation.roll));
+        return matrix;
+    }
+    static createRotationX(angle, target = new Matrix3()) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        target.data[0] = 1;
+        target.data[1] = 0;
+        target.data[2] = 0;
+        target.data[4] = 0;
+        target.data[5] = cos;
+        target.data[6] = sin;
+        target.data[8] = 0;
+        target.data[9] = -sin;
+        target.data[10] = cos;
+        return target;
+    }
+    static createRotationY(angle, target = new Matrix3()) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        target.data[0] = cos;
+        target.data[1] = 0;
+        target.data[2] = -sin;
+        target.data[4] = 0;
+        target.data[5] = 1;
+        target.data[6] = 0;
+        target.data[8] = sin;
+        target.data[9] = 0;
+        target.data[10] = cos;
+        return target;
+    }
+    static createRotationZ(angle, target = new Matrix3()) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        target.data[0] = cos;
+        target.data[1] = sin;
+        target.data[2] = 0;
+        target.data[4] = -sin;
+        target.data[5] = cos;
+        target.data[6] = 0;
+        target.data[8] = 0;
+        target.data[9] = 0;
+        target.data[10] = 1;
+        return target;
+    }
+}
+
+var Orientation;
+(function (Orientation) {
+    Orientation[Orientation["North"] = 0] = "North";
+    Orientation[Orientation["East"] = 1] = "East";
+    Orientation[Orientation["South"] = 2] = "South";
+    Orientation[Orientation["West"] = 3] = "West";
+    Orientation[Orientation["Up"] = 4] = "Up";
+    Orientation[Orientation["Down"] = 5] = "Down";
+})(Orientation || (Orientation = {}));
+(function (Orientation) {
+    const rotations = new Map();
+    function getRotation(orientation) {
+        if (!rotations.has(orientation)) {
+            rotations.set(orientation, calculateRotation(orientation));
+        }
+        return rotations.get(orientation);
+    }
+    Orientation.getRotation = getRotation;
+    function toId(orientation) {
+        switch (orientation) {
+            case Orientation.North: return 'north';
+            case Orientation.East: return 'east';
+            case Orientation.South: return 'south';
+            case Orientation.West: return 'west';
+            case Orientation.Up: return 'up';
+            case Orientation.Down: return 'down';
+        }
+    }
+    Orientation.toId = toId;
+    function calculateRotation(orientation) {
+        switch (orientation) {
+            case Orientation.North: return Rotation.fromDegrees(0, 0, 0);
+            case Orientation.East: return Rotation.fromDegrees(0, 90, 0);
+            case Orientation.South: return Rotation.fromDegrees(0, 180, 0);
+            case Orientation.West: return Rotation.fromDegrees(0, 270, 0);
+            case Orientation.Up: return Rotation.fromDegrees(-90, 0, 0);
+            case Orientation.Down: return Rotation.fromDegrees(90, 0, 0);
+        }
+    }
+    const matrices = new Map();
+    function getMatrix(orientation) {
+        if (!matrices.has(orientation)) {
+            matrices.set(orientation, Matrix3.createRotation(getRotation(orientation)));
+        }
+        return matrices.get(orientation);
+    }
+    Orientation.getMatrix = getMatrix;
+})(Orientation || (Orientation = {}));
+
+var Axis;
+(function (Axis) {
+    Axis[Axis["X"] = 0] = "X";
+    Axis[Axis["Y"] = 1] = "Y";
+    Axis[Axis["Z"] = 2] = "Z";
+})(Axis || (Axis = {}));
+(function (Axis) {
+    function orientation(axis) {
+        return axis == Axis.X ? Orientation.East : axis == Axis.Y ? Orientation.Up : Orientation.North;
+    }
+    Axis.orientation = orientation;
+    function name(axis) {
+        return axis == Axis.X ? "x" : axis == Axis.Y ? "y" : "z";
+    }
+    Axis.name = name;
+})(Axis || (Axis = {}));
+
+class LogPrototype extends BaseBlockPrototype {
+    model;
+    constructor(model) {
+        super();
+        this.model = model;
+    }
     whenPlaced(position) {
         console.log("Grass placed at " + position.toString());
     }
     getBlockModel(position) {
-        return GrassPrototype.model;
+        return this.model;
     }
-    static model;
-    static top;
-    static side;
-    static bottom;
     static async setup() {
-        this.top = await Texture.load("blocks.grass.top");
-        this.side = await Texture.load("blocks.grass.side");
-        this.bottom = await Texture.load("blocks.dirt");
-        this.model = new BlockModel();
-        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), [this.side, this.side, this.side, this.side, this.top, this.bottom]);
-        const rotated = new RotatedModelComponent(new Rotation(0, 0, 0), new ImmutableVector3D(0, 0, 0), box);
-        this.model.add(rotated);
-    }
-    static getBlockModel() {
-        return GrassPrototype.model;
+        const end = await Texture.load("blocks.log.end");
+        const side = await Texture.load("blocks.log.side");
+        for (let a = 0; a < 3; a++) {
+            const axis = a;
+            const model = new BlockModel();
+            const box = new BoxModelComponent(new Vector3(1, 1, 1), [side, side, side, side, end, end]);
+            const rotated = new RotatedModelComponent(Orientation.getRotation(Axis.orientation(axis)), new Vector3(0.5, 0.5, 0.5), box);
+            model.add(rotated);
+            Registries.blockModels.register('log.along_' + Axis.name(axis), model);
+            Registries.blocks.register('log.along_' + Axis.name(axis), new LogPrototype(model));
+        }
     }
 }
 
@@ -2157,7 +2949,7 @@ class StonePrototype extends BaseBlockPrototype {
     static async setup() {
         this.texture = await Texture.load("blocks.stone");
         this.model = new BlockModel();
-        const box = new BoxModelComponent(new ImmutableVector3D(1, 1, 1), new Array(6).fill(this.texture));
+        const box = new BoxModelComponent(new Vector3(1, 1, 1), new Array(6).fill(this.texture));
         this.model.add(box);
     }
     static getBlockModel() {
@@ -2172,11 +2964,6 @@ class BaseEntityPrototype {
 
 var EntityPhysics;
 (function (EntityPhysics) {
-    function applyGravity(entity, delta) {
-        const state = entity.getPhysicalState();
-        const properties = entity.getPhysicalProperties();
-        state.applyForce(new ImmutableVector3D(0, properties.gravity * delta, 0));
-    }
     function isOnGround(entity) {
         return false;
     }
@@ -2185,23 +2972,19 @@ var EntityPhysics;
         const state = entity.getPhysicalState();
         const properties = entity.getPhysicalProperties();
         {
-            state.applyFriction(new ImmutableVector3D(properties.friction.air, properties.friction.air, properties.friction.air));
+            state.applyFriction(new Vector3(properties.friction.air, properties.friction.air, properties.friction.air));
         }
     }
     function applyVelocity(entity, delta) {
         const state = entity.getPhysicalState();
-        const position = entity.getPosition();
-        const velocity = state.getVelocity();
-        position.x += velocity.x * delta;
-        position.y += velocity.y * delta;
-        position.z += velocity.z * delta;
-        entity.setPosition(position);
+        entity.getPosition()
+            .add(state.getVelocity().times(delta));
     }
     function simulateEntity(entity, delta) {
         if (!entity.getPhysicalState() || !entity.getPhysicalProperties()) {
             return;
         }
-        applyGravity(entity, delta);
+        //applyGravity(entity, delta);
         applyFriction(entity);
         applyVelocity(entity, delta);
     }
@@ -2209,7 +2992,7 @@ var EntityPhysics;
 })(EntityPhysics || (EntityPhysics = {}));
 
 class PhysicalEntityState {
-    velocity = new MutableVector3D();
+    velocity = new Vector3();
     getVelocity() {
         return this.velocity.clone();
     }
@@ -2220,7 +3003,7 @@ class PhysicalEntityState {
         this.velocity.add(force);
     }
     applyFriction(friction) {
-        this.velocity.scalarMultiply(friction);
+        this.velocity.multiply(friction);
     }
 }
 
@@ -2262,20 +3045,14 @@ class PhysicalHitbox {
     position;
     size;
     constructor(position, size) {
-        this.position = new MutableVector3D(position);
-        this.size = new MutableVector3D(size);
+        this.position = Vector3.immutable(position.clone());
+        this.size = Vector3.immutable(size.clone());
     }
     getPosition() {
-        return this.position.clone();
-    }
-    setPosition(position) {
-        this.position = position;
+        return this.position;
     }
     getSize() {
-        return this.size.clone();
-    }
-    setSize(size) {
-        this.size = size;
+        return this.size;
     }
     getIntersection(rayWalker) {
         let position = rayWalker.getPosition();
@@ -2321,54 +3098,11 @@ class PhysicalModel {
     }
 }
 
-class HandleableVector3D extends MutableVector3D {
-    _listeners;
-    constructor(x = 0, y = 0, z = 0) {
-        super(x, y, z);
-        this._listeners = new Set();
-    }
-    on(type, handler) {
-        if (type == 'change') {
-            this._listeners.add(handler);
-        }
-        else {
-            throw new Error('Unknown event type');
-        }
-    }
-    cause(type) {
-        if (type == 'change') {
-            for (const listener of this._listeners) {
-                listener();
-            }
-        }
-        else {
-            throw new Error('Unknown event type');
-        }
-    }
-    _set(x, y, z) {
-        this.cause('change');
-        return super._set(x, y, z);
-    }
-    clone() {
-        throw new Error("Cannot clone handleable vector. Instead use immutable() or mutable() to output a non-handlable vector.");
-    }
-    immutable() {
-        return new ImmutableVector3D(this.x, this.y, this.z);
-    }
-    mutable() {
-        return new MutableVector3D(this.x, this.y, this.z);
-    }
-    static from(vector, format) {
-        const values = [...Vector3D._from(vector, format)];
-        return new HandleableVector3D(values[0], values[1], values[2]);
-    }
-}
-
 class BaseEntity {
     id;
     chunk;
     world;
-    position = new HandleableVector3D();
+    position = Vector3.handle(new Vector3());
     rotation = new Rotation();
     constructor() {
         this.position.on('change', () => {
@@ -2387,6 +3121,9 @@ class BaseEntity {
                     let chunk = this.world.getChunk(targetChunkX, targetChunkZ);
                     if (!chunk) {
                         chunk = this.world.loadChunk(targetChunkX, targetChunkZ);
+                    }
+                    if (chunk.loadState.current != Infinity) {
+                        chunk.loadState.target = Infinity;
                     }
                     // Update the chunk the entity is in.
                     this.setParentChunk(chunk);
@@ -2435,22 +3172,8 @@ class BaseEntity {
     getPosition() {
         return this.position;
     }
-    setPosition(x, y, z) {
-        if (x instanceof Vector3D) {
-            this.position.set(x.x, x.y, x.z);
-        }
-        else if (typeof y == 'number' && typeof z == 'number') {
-            this.position.set(x, y, z);
-        }
-        else {
-            throw new Error("Invalid arguments to BaseEntity.setPosition()");
-        }
-    }
     getRotation() {
         return this.rotation;
-    }
-    setRotation(rotation) {
-        this.rotation = rotation;
     }
     getUniqueId() {
         return this.id;
@@ -2479,10 +3202,10 @@ class PlayerEntity extends BaseEntity {
     physicalProperties = {
         gravity: -0.3,
         friction: {
-            air: 0.01,
-            ground: 0.5
+            air: 0.9,
+            ground: 0.8
         },
-        model: new PhysicalModel(new BoxPhysicalComponent(new PhysicalHitbox(new ImmutableVector3D(0, 0, 0), new ImmutableVector3D(1, 1.8, 1))))
+        model: new PhysicalModel(new BoxPhysicalComponent(new PhysicalHitbox(new Vector3(0, 0, 0), new Vector3(1, 1.8, 1))))
     };
     getPrototype() {
         return Registries.entities.get('player');
@@ -2520,6 +3243,9 @@ async function loadGameContent() {
     Registries.blocks.register('grass', new GrassPrototype());
     Registries.blockModels.register('grass', GrassPrototype.getBlockModel());
     Registries.blocks.register('air', new AirPrototype());
+    await LogPrototype.setup();
+    await LeavesPrototype.setup();
+    await CobblestonePrototype.setup();
 }
 
 class EventClock {
@@ -2763,111 +3489,6 @@ class Color {
     }
 }
 
-var Axis;
-(function (Axis) {
-    Axis[Axis["X"] = 0] = "X";
-    Axis[Axis["Y"] = 1] = "Y";
-    Axis[Axis["Z"] = 2] = "Z";
-})(Axis || (Axis = {}));
-
-class Matrix3 {
-    data;
-    constructor(data = [1, 0, 0, 0, 1, 0, 0, 0, 1]) {
-        this.data = data;
-    }
-    multiply(value) {
-        if (value instanceof Vector3D) {
-            return Matrix3.multiplyVector(this, value);
-        }
-        else if (value instanceof Matrix3) {
-            return Matrix3.multiply(this, value, this);
-        }
-        else {
-            throw new Error("Invalid arguments");
-        }
-    }
-    static multiply(matrix1, matrix2, target = new Matrix3()) {
-        const a = matrix1.data;
-        const b = matrix2.data;
-        const c = target.data;
-        const a00 = a[0], a01 = a[1], a02 = a[2];
-        const a10 = a[3], a11 = a[4], a12 = a[5];
-        const a20 = a[6], a21 = a[7], a22 = a[8];
-        const b00 = b[0], b01 = b[1], b02 = b[2];
-        const b10 = b[3], b11 = b[4], b12 = b[5];
-        const b20 = b[6], b21 = b[7], b22 = b[8];
-        c[0] = b00 * a00 + b01 * a10 + b02 * a20;
-        c[1] = b00 * a01 + b01 * a11 + b02 * a21;
-        c[2] = b00 * a02 + b01 * a12 + b02 * a22;
-        c[3] = b10 * a00 + b11 * a10 + b12 * a20;
-        c[4] = b10 * a01 + b11 * a11 + b12 * a21;
-        c[5] = b10 * a02 + b11 * a12 + b12 * a22;
-        c[6] = b20 * a00 + b21 * a10 + b22 * a20;
-        c[7] = b20 * a01 + b21 * a11 + b22 * a21;
-        c[8] = b20 * a02 + b21 * a12 + b22 * a22;
-        return target;
-    }
-    static multiplyVector(matrix, vector, target = new MutableVector3D()) {
-        const a = matrix.data;
-        const b = vector;
-        const c = target;
-        const x = b.x, y = b.y, z = b.z;
-        c.x = a[0] * x + a[3] * y + a[6] * z;
-        c.y = a[1] * x + a[4] * y + a[7] * z;
-        c.z = a[2] * x + a[5] * y + a[8] * z;
-        return target;
-    }
-    static createRotation(rotation, target = new Matrix3()) {
-        let matrix = target || new Matrix3();
-        matrix.multiply(Matrix3.createRotationY(rotation.yaw));
-        matrix.multiply(Matrix3.createRotationX(rotation.pitch));
-        matrix.multiply(Matrix3.createRotationZ(rotation.roll));
-        return matrix;
-    }
-    static createRotationX(angle, target = new Matrix3()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = 1;
-        target.data[1] = 0;
-        target.data[2] = 0;
-        target.data[4] = 0;
-        target.data[5] = cos;
-        target.data[6] = sin;
-        target.data[8] = 0;
-        target.data[9] = -sin;
-        target.data[10] = cos;
-        return target;
-    }
-    static createRotationY(angle, target = new Matrix3()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = cos;
-        target.data[1] = 0;
-        target.data[2] = -sin;
-        target.data[4] = 0;
-        target.data[5] = 1;
-        target.data[6] = 0;
-        target.data[8] = sin;
-        target.data[9] = 0;
-        target.data[10] = cos;
-        return target;
-    }
-    static createRotationZ(angle, target = new Matrix3()) {
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        target.data[0] = cos;
-        target.data[1] = sin;
-        target.data[2] = 0;
-        target.data[4] = -sin;
-        target.data[5] = cos;
-        target.data[6] = 0;
-        target.data[8] = 0;
-        target.data[9] = 0;
-        target.data[10] = 1;
-        return target;
-    }
-}
-
 class Matrix4 {
     data;
     constructor(source) {
@@ -2890,7 +3511,7 @@ class Matrix4 {
         }
     }
     multiply(value) {
-        if (value instanceof Vector3D) {
+        if (value instanceof Vector3) {
             return Matrix4.multiplyVector(this, value);
         }
         else if (value instanceof Matrix4) {
@@ -2901,7 +3522,7 @@ class Matrix4 {
         }
     }
     get translation() {
-        return new ImmutableVector3D(this.data[12], this.data[13], this.data[14]);
+        return new Vector3(this.data[12], this.data[13], this.data[14]);
     }
     set translation(value) {
         this.data[12] = value.x;
@@ -2938,7 +3559,7 @@ class Matrix4 {
         c[15] = b30 * a03 + b31 * a13 + b32 * a23 + b33 * a33;
         return target;
     }
-    static multiplyVector(matrix, vector, target = new MutableVector3D()) {
+    static multiplyVector(matrix, vector, target = new Vector3()) {
         const a = matrix.data;
         const b = vector;
         const c = target;
@@ -3192,7 +3813,7 @@ class BindGroup {
     creationStack;
     constructor(index) {
         this.index = index;
-        this.creationStack = new Error().stack ;
+        this.creationStack = undefined;
     }
     async setup(device) {
         for (const entry of this.entries) {
@@ -3215,29 +3836,6 @@ class BindGroup {
             layout: this.layout,
             entries: bindGroupEntries
         });
-        {
-            console.groupCollapsed("GPU Bind Group #" + this.index);
-            console.log(this.group);
-            console.log(this.layout);
-            console.groupCollapsed("Entries");
-            for (const entry of this.entries) {
-                console.groupCollapsed(entry.getLabel());
-                console.log(entry.getBindGroupEntry());
-                console.log(entry.getLayoutEntry());
-                console.log(entry);
-                console.groupEnd();
-            }
-            console.groupEnd();
-            console.groupCollapsed("Stack traces");
-            if (this.creationStack) {
-                console.log("%cnew BindGroup()%c\n" + this.creationStack.split("\n").slice(1).join("\n"), "text-decoration: underline;", "");
-            }
-            const stack = new Error().stack;
-            if (stack)
-                console.log("%cbindGroup.setup()%c\n" + stack.split("\n").slice(1).join("\n"), "text-decoration: underline;", "");
-            console.groupEnd();
-            console.groupEnd();
-        }
     }
     addEntry(binding, entry) {
         this.entries.add(entry);
@@ -3252,7 +3850,7 @@ class BindGroup {
     getBindGroup() {
         return this.group;
     }
-    static LOGGING = true;
+    static LOGGING = false;
 }
 
 class BaseBindGroupEntry {
@@ -3417,7 +4015,8 @@ class GraphicsDevice {
         this.context = this.canvas.getContext('webgpu');
         this.context.configure({
             device: this.device,
-            format: navigator.gpu.getPreferredCanvasFormat()
+            format: navigator.gpu.getPreferredCanvasFormat(),
+            alphaMode: 'premultiplied'
         });
     }
     getDevice() {
@@ -3649,6 +4248,7 @@ class BaseRenderPass {
     bindGroupManager;
     device;
     depthTest = false;
+    alpha = false;
     setBindGroupManager(bindGroupManager) {
         this.bindGroupManager = new PipelineBindGroupManager(bindGroupManager);
     }
@@ -3679,11 +4279,28 @@ class BaseRenderPass {
         };
     }
     addFragmentStage(module, entryPoint) {
+        let target = {
+            format: navigator.gpu.getPreferredCanvasFormat()
+        };
+        if (this.alpha) {
+            target.blend = {
+                color: {
+                    srcFactor: "src-alpha",
+                    dstFactor: "one-minus-src-alpha",
+                    operation: "add"
+                },
+                alpha: {
+                    srcFactor: "src-alpha",
+                    dstFactor: "one-minus-src-alpha",
+                    operation: "add"
+                }
+            };
+        }
         this.descriptor.fragment = {
             module: module.getShaderModule(),
             entryPoint,
             targets: [
-                { format: navigator.gpu.getPreferredCanvasFormat() }
+                target
             ]
         };
     }
@@ -3731,6 +4348,7 @@ class TerrainRenderPass extends BaseRenderPass {
     indirectDrawBuffer;
     chunkPositionBuffer;
     depthTest = true;
+    depthBufferFactor = 0.0;
     constructor(worldMirror) {
         super();
         this.worldMirror = worldMirror;
@@ -3759,6 +4377,8 @@ class TerrainRenderPass extends BaseRenderPass {
         await this.setupTextureSamplerBindings(terrainBindGroup, device);
         await this.setupChunkPositionBindings(terrainBindGroup, device);
         this.getBindGroupManager().useBindGroup(terrainBindGroup);
+        // const configureBindGroup = new BindGroup(2);
+        // configureBindGroup.addEntry(0, new );
     }
     async setupGeometryBindings(bindGroup, device) {
         const gpuDevice = device.getDevice();
@@ -3865,7 +4485,7 @@ class RenderWorldMirror {
         for (let x = perspectiveLocation.x - renderDistance; x <= perspectiveLocation.x + renderDistance; x++) {
             for (let z = perspectiveLocation.y - renderDistance; z <= perspectiveLocation.y + renderDistance; z++) {
                 const chunk = world.getChunk(x, z);
-                if (!chunk || chunk.isPlaceholder()) {
+                if (!chunk || chunk.loadState.current != Infinity) {
                     continue;
                 }
                 const key = x + '.' + z;
@@ -3920,14 +4540,10 @@ class MeshAssembler {
         this.models = Array.from(models);
     }
     setupModelsAndIndexes() {
-        {
-            console.groupCollapsed("Models");
-        }
         this.modelIndexes = new Map();
         const modelVertexPositions = [];
         const modelTextureMappings = [];
         const modelTextureIds = [];
-        let modelIndex = 0;
         let vertexIndex = 0;
         for (const model of this.models) {
             const vertexPositions = model.getVertexPositions();
@@ -3937,26 +4553,9 @@ class MeshAssembler {
             modelVertexPositions.push(vertexPositions);
             modelTextureMappings.push(textureMappings);
             modelTextureIds.push(textureIds);
-            {
-                console.groupCollapsed(`Model ${modelIndex}: ${model.getRegisteredName()}`);
-                console.groupCollapsed("Vertex positions");
-                console.log(vertexPositions);
-                console.groupEnd();
-                console.groupCollapsed("Texture mappings");
-                console.log(textureMappings);
-                console.groupEnd();
-                console.groupCollapsed("Texture ids");
-                console.log(textureIds);
-                console.groupEnd();
-                console.groupEnd();
-            }
             vertexIndex += vertexPositions.length / 3;
             const endIndex = vertexIndex;
             this.modelIndexes.set(model, [startIndex, endIndex]);
-            modelIndex++;
-        }
-        {
-            console.groupEnd();
         }
         return {
             modelGeometries: modelVertexPositions,
@@ -3968,9 +4567,6 @@ class MeshAssembler {
     assembleMeshes() {
         if (this.texture) {
             return this.createAssembledMesh();
-        }
-        {
-            console.groupCollapsed("Assembled mesh");
         }
         const { modelGeometries, modelTextureMappings, modelTextureIds, totalVertexCount } = this.setupModelsAndIndexes();
         this.vertexPositions = new Float32Array(DataUtils.concat(modelGeometries));
@@ -3996,16 +4592,6 @@ class MeshAssembler {
                     this.textureMappings[modelOffset * 2 + offset + 1] = (textureMappings[offset + 1]) / combinedSize.y;
                 }
             }
-        }
-        {
-            console.groupCollapsed("Vertex positions");
-            console.log(this.vertexPositions);
-            console.groupEnd();
-            console.groupCollapsed("Texture mappings");
-            console.log(this.textureMappings);
-            console.groupEnd();
-            console.log("%cTexture has been added to the bottom of the document", "font-style: italic;");
-            console.groupEnd();
         }
         return this.createAssembledMesh();
     }
@@ -4051,20 +4637,10 @@ class MeshAssembler {
             xOffset += texture.getTextureWidth();
             textureIndex++;
         }
-        {
-            canvas.convertToBlob().then(blob => {
-                const url = URL.createObjectURL(blob);
-                const img = new Image();
-                img.onload = () => {
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            });
-        }
         const texture = Texture.fromImageData(context.getImageData(0, 0, size.x, size.y));
         return { texturePositions, texture };
     }
-    static PRINT_OUTPUT = true;
+    static PRINT_OUTPUT = false;
 }
 
 class InstancedDataSegment {
@@ -4104,12 +4680,12 @@ class InstancedData {
         this.chunkData = chunkData;
     }
     static cullDirections = [
-        new ImmutableVector3D(-1, 0, 0),
-        new ImmutableVector3D(1, 0, 0),
-        new ImmutableVector3D(0, -1, 0),
-        new ImmutableVector3D(0, 1, 0),
-        new ImmutableVector3D(0, 0, -1),
-        new ImmutableVector3D(0, 0, 1)
+        new Vector3(-1, 0, 0),
+        new Vector3(1, 0, 0),
+        new Vector3(0, -1, 0),
+        new Vector3(0, 1, 0),
+        new Vector3(0, 0, -1),
+        new Vector3(0, 0, 1)
     ];
     canCull(position) {
         for (const direction of InstancedData.cullDirections) {
@@ -4156,9 +4732,6 @@ class InstancedData {
         this.UPDATES++;
         if (this.UPDATES > 1)
             return;
-        let culls = 0;
-        let rendered = 0;
-        let empty = 0;
         this.segments = [];
         let lastType = null;
         let lastSegment = null;
@@ -4170,10 +4743,6 @@ class InstancedData {
             if (model == null || this.canCull(position)) {
                 lastSegment = null;
                 lastType = null;
-                if (model)
-                    culls++;
-                else
-                    empty++;
                 continue;
             }
             if (model != lastType) {
@@ -4184,13 +4753,6 @@ class InstancedData {
             else if (lastSegment && model == lastType) {
                 lastSegment.setSize(lastSegment.getSize() + 1);
             }
-            rendered++;
-        }
-        {
-            this.verifyCalls();
-        }
-        {
-            console.log(`Culled ${culls} blocks\nRendered ${rendered} blocks\n${empty} blocks without models\nof ${culls + rendered + empty}/${ChunkDataReferencer.cells} total blocks`);
         }
     }
     verifyCalls() {
@@ -4234,8 +4796,8 @@ class InstancedData {
             }
         }
     }
-    static VERIFY_CALLS = true;
-    static LOG_CULLING = true;
+    static VERIFY_CALLS = false;
+    static LOG_CULLING = false;
 }
 
 class WebGPUInstancedData extends InstancedData {
@@ -4367,7 +4929,7 @@ class WebGPURenderer {
         const terrainRenderPass = new TerrainRenderPass(this.renderedWorld);
         terrainRenderPass.setBindGroupManager(this.bindGroupManager);
         this.passes = [
-            new ClearRenderPass(new Color(0, 0.1, 0.2, 1)),
+            new ClearRenderPass(new Color(0, 0, 0, 1)),
             terrainRenderPass
         ];
     }
@@ -4488,64 +5050,17 @@ class Renderer {
     }
 }
 
-class OrbitPerspective {
+class EntityPerspective {
     entity;
-    clock;
     matrix;
-    location;
-    rotation;
-    chunkLocation;
-    mousePosition;
-    distance = 64;
-    constructor(entity, clock) {
+    constructor(entity) {
         this.entity = entity;
-        this.clock = clock;
-        document.addEventListener('mousemove', event => {
-            if (event.shiftKey) {
-                this.distance = this.distance + event.movementY / 2;
-            }
-            else {
-                this.mousePosition = new ImmutableVector2D(event.clientX, event.clientY);
-            }
-        });
-        this.mousePosition = new ImmutableVector2D();
     }
-    computeLocation(mousePosition) {
-        let location = this.entity.getPosition().mutable();
-        let angleX = -(mousePosition.x - window.innerWidth / 2) / window.innerWidth * 2 * Math.PI;
-        let angleY = -(mousePosition.y - window.innerHeight / 2) / window.innerHeight * Math.PI;
-        let offsetX = Math.sin(angleX) * this.distance;
-        let offsetY = Math.sin(angleY + Math.PI) * this.distance;
-        let offsetZ = Math.cos(angleX) * this.distance;
-        location.x += offsetX;
-        location.y += offsetY;
-        location.z += offsetZ;
-        this.location = location;
-    }
-    computeRotation(mousePosition) {
-        let rotation = this.entity.getRotation().clone();
-        let angleX = -(mousePosition.x - window.innerWidth) / window.innerWidth * 2 * Math.PI;
-        let angleY = -(mousePosition.y - window.innerHeight / 2) / window.innerHeight * Math.PI;
-        rotation.yaw = (angleX + Math.PI) % (Math.PI * 2);
-        rotation.pitch = angleY;
-        this.rotation = rotation;
-    }
-    computeTransformationMatrix() {
-        let matrix = new Matrix4();
-        matrix.multiply(Matrix4.createTranslation(this.location));
-        matrix.multiply(Matrix4.createRotation(this.rotation));
-        this.matrix = matrix;
-    }
-    computeChunkLocation() {
+    getChunkLocation() {
         if (!this.entity.getParentChunk()) {
             throw new Error("Cannot get chunk location of unbound entity");
         }
-        const chunkX = Math.floor(this.location.x / ChunkDataReferencer.dimensions.x);
-        const chunkZ = Math.floor(this.location.z / ChunkDataReferencer.dimensions.z);
-        this.chunkLocation = new ImmutableVector2D(chunkX, chunkZ);
-    }
-    getChunkLocation() {
-        return this.chunkLocation;
+        return this.entity.getParentChunk().getPosition();
     }
     getTransformationMatrix() {
         return this.matrix;
@@ -4554,10 +5069,106 @@ class OrbitPerspective {
         return 10;
     }
     updatePerspective() {
-        this.computeLocation(this.mousePosition);
-        this.computeRotation(this.mousePosition);
-        this.computeChunkLocation();
-        this.computeTransformationMatrix();
+        this.matrix = this.computeTransformationMatrix();
+    }
+    computeTransformationMatrix() {
+        let matrix = new Matrix4();
+        matrix.multiply(Matrix4.createTranslation(this.entity.getPosition()));
+        matrix.multiply(Matrix4.createRotation(this.entity.getRotation()));
+        return matrix;
+    }
+}
+
+class EntityFlyControls {
+    entity;
+    constructor(entity) {
+        this.entity = entity;
+        document.addEventListener('keydown', this.onKeyDown.bind(this));
+        document.addEventListener('keyup', this.onKeyUp.bind(this));
+        document.addEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
+        document.addEventListener('mousemove', this.onMouseMove.bind(this));
+        document.addEventListener('click', () => {
+            if (!this.pointerLocked) {
+                document.body.requestPointerLock();
+            }
+        });
+    }
+    keys = new Set();
+    pointerLocked = false;
+    speed = 2;
+    lastPressedForwardKey = null;
+    lastPressedSideKey = null;
+    lastPressedUpKey = null;
+    onKeyDown(event) {
+        this.keys.add(event.code);
+        if (event.code === 'KeyW' || event.code === 'KeyS') {
+            this.lastPressedForwardKey = event.code;
+        }
+        if (event.code === 'KeyA' || event.code === 'KeyD') {
+            this.lastPressedSideKey = event.code;
+        }
+        if (event.code === 'Space' || event.code === 'ShiftLeft') {
+            this.lastPressedUpKey = event.code;
+        }
+    }
+    onKeyUp(event) {
+        this.keys.delete(event.code);
+        if (event.code === this.lastPressedForwardKey) {
+            this.lastPressedForwardKey = null;
+        }
+        if (event.code === this.lastPressedSideKey) {
+            this.lastPressedSideKey = null;
+        }
+        if (event.code === this.lastPressedUpKey) {
+            this.lastPressedUpKey = null;
+        }
+    }
+    onPointerLockChange() {
+        this.pointerLocked = document.pointerLockElement === document.body;
+    }
+    onMouseMove(event) {
+        if (this.pointerLocked) {
+            const rotation = this.entity.getRotation();
+            rotation.yaw += -event.movementX * 0.01;
+            rotation.pitch += -event.movementY * 0.01;
+        }
+    }
+    move(direction) {
+        const physicalState = this.entity.getPhysicalState();
+        if (!physicalState)
+            return;
+        const rotation = this.entity.getRotation();
+        const forward = new ImmutableVector2D(-Math.sin(rotation.yaw), -Math.cos(rotation.yaw));
+        const right = new ImmutableVector2D(-forward.y, forward.x);
+        forward.scalarMultiply(5);
+        right.scalarMultiply(3);
+        physicalState.applyForce(new Vector3(forward.x * direction.y + right.x * direction.x, 0, forward.y * direction.y + right.y * direction.x).times(this.speed));
+    }
+    fly(direction) {
+        const physicalState = this.entity.getPhysicalState();
+        if (!physicalState)
+            return;
+        physicalState.applyForce(new Vector3(0, direction * this.speed, 0));
+    }
+    update() {
+        if (this.lastPressedForwardKey == 'KeyW' || (!this.lastPressedForwardKey && this.keys.has('KeyW'))) {
+            this.move(new ImmutableVector2D(0, 1));
+        }
+        if (this.lastPressedForwardKey == 'KeyS' || (!this.lastPressedForwardKey && this.keys.has('KeyS'))) {
+            this.move(new ImmutableVector2D(0, -1));
+        }
+        if (this.lastPressedSideKey == 'KeyA' || (!this.lastPressedSideKey && this.keys.has('KeyA'))) {
+            this.move(new ImmutableVector2D(-1, 0));
+        }
+        if (this.lastPressedSideKey == 'KeyD' || (!this.lastPressedSideKey && this.keys.has('KeyD'))) {
+            this.move(new ImmutableVector2D(1, 0));
+        }
+        if (this.lastPressedUpKey == 'Space' || (!this.lastPressedUpKey && this.keys.has('Space'))) {
+            this.fly(1);
+        }
+        if (this.lastPressedUpKey == 'ShiftLeft' || (!this.lastPressedUpKey && this.keys.has('ShiftLeft'))) {
+            this.fly(-1);
+        }
     }
 }
 
@@ -4566,14 +5177,8 @@ class SingleplayerWorldLoader {
     constructor(worldGenerator) {
         this.worldGenerator = worldGenerator;
     }
-    loadChunk(location) {
-        return this.worldGenerator.generateChunk(location);
-    }
-    saveChunk(location, chunk) {
-        return Promise.resolve();
-    }
-    shouldUnloadChunks() {
-        return false;
+    bindWorld(world) {
+        this.worldGenerator.bindWorld(world);
     }
 }
 
@@ -4586,7 +5191,7 @@ class Client extends Game {
         super();
         this.worldGenerator = new SimpleWorldGenerator();
         this.worldLoader = new SingleplayerWorldLoader(this.worldGenerator);
-        this.getWorld().bindWorldLoader(this.worldLoader);
+        this.getWorld().setWorldLoader(this.worldLoader);
         this.clockViewer = new EventClockViewer(this.getClock());
         this.renderer = new Renderer(this.getWorld());
     }
@@ -4603,9 +5208,11 @@ class Client extends Game {
         const playerPrototype = Registries.entities.get('player');
         const playerEntity = playerPrototype.createEntity();
         world.addEntity(playerEntity);
-        playerEntity.setPosition(8, ChunkDataReferencer.dimensions.y, 8);
-        const playerPerspective = new OrbitPerspective(playerEntity, this.getClock());
+        playerEntity.getPosition().set(8, ChunkDataReferencer.dimensions.y, 8);
+        const playerPerspective = new EntityPerspective(playerEntity);
         this.getRenderer().getWorldRenderer().setPerspective(playerPerspective);
+        const controls = new EntityFlyControls(playerEntity);
+        this.getClock().schedule("controls", () => controls.update());
         for (let x = -4; x <= 4; x++) {
             for (let z = -4; z <= 4; z++) {
                 world.loadChunk(x, z);
@@ -4615,6 +5222,7 @@ class Client extends Game {
         clock.schedule("tickWorld", async () => await this.getWorld().tick(clock.getDelta()));
         clock.schedule("render", async () => await this.renderer.render());
         clock.schedule("displayClockInfo", () => this.clockViewer.update());
+        clock.schedule("generateChunks", async () => await this.worldGenerator.generateChunks(1));
         clock.start();
     }
 }
